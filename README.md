@@ -11,7 +11,7 @@
 
 <br>
 
-[🌐 **Voir le site du projet**](https://aminenakrou.github.io/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/) · [📄 **Lire le rapport**](rapport/NAKROU_YAHI__RAPPORT_BIGDATA.pdf) · [🐛 **Signaler un bug**](https://github.com/AmiNeNakrou/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/issues)
+[🌐 **Voir le site du projet**](https://aminenakrou.github.io/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/) · [📄 **Lire le rapport**]([rapport/NAKROU_YAHI__RAPPORT_BIGDATA.pdf](https://github.com/aminenakrou/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/blob/main/NAKROU_YAHI__RAPPORT_BIGDATA.pdf)) · [🐛 **Signaler un bug**](https://github.com/AmiNeNakrou/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/issues)
 
 </div>
 
@@ -198,6 +198,6 @@ python pagerank_personnalise.py
 
 **[🌐 Voir le site interactif](https://aminenakrou.github.io/Big_Data_Project-PageRank_Analysis_on_Wikispeedia_Dataset/)** · **[📄 Lire le rapport](rapport/NAKROU_YAHI__RAPPORT_BIGDATA.pdf)**
 
-<sub>Projet Big Data — IS4 · Université de Lille</sub>
+<sub>Projet Big Data — IS4 · Polytech LILLE </sub>
 
 </div>
