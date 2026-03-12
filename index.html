@@ -5,1640 +5,935 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PageRank × Wikispeedia — Analyse Big Data</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0a0a0f;
-            --bg-card: #111118;
-            --bg-card-hover: #16161f;
-            --surface: #1a1a25;
-            --border: #2a2a3a;
-            --text: #e8e8f0;
-            --text-muted: #8888a0;
-            --accent: #6366f1;
-            --accent-light: #818cf8;
-            --accent-glow: rgba(99, 102, 241, 0.15);
-            --green: #34d399;
-            --orange: #fb923c;
-            --rose: #f472b6;
-            --cyan: #22d3ee;
-            --gold: #fbbf24;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Sora', sans-serif;
-            line-height: 1.7;
-            overflow-x: hidden;
-        }
-
-        /* ── NOISE OVERLAY ── */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-            pointer-events: none;
-            z-index: 9999;
-        }
-
-        /* ── NAVIGATION ── */
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 100;
-            padding: 1rem 2rem;
-            backdrop-filter: blur(20px);
-            background: rgba(10, 10, 15, 0.8);
-            border-bottom: 1px solid var(--border);
-            transition: all 0.3s;
-        }
-
-        nav .nav-inner {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        nav .logo {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            font-size: 0.9rem;
-            letter-spacing: -0.02em;
-            color: var(--accent-light);
-        }
-
-        nav .logo span { color: var(--text-muted); }
-
-        nav ul {
-            list-style: none;
-            display: flex;
-            gap: 2rem;
-        }
-
-        nav ul a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.82rem;
-            font-weight: 400;
-            letter-spacing: 0.03em;
-            transition: color 0.3s;
-            position: relative;
-        }
-
-        nav ul a::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            left: 0;
-            width: 0;
-            height: 1px;
-            background: var(--accent);
-            transition: width 0.3s;
-        }
-
-        nav ul a:hover { color: var(--text); }
-        nav ul a:hover::after { width: 100%; }
-
-        /* ── HERO ── */
-        .hero {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            padding: 6rem 2rem 4rem;
-        }
-
-        .hero-bg {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-        }
-
-        .hero-bg .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            animation: float 8s ease-in-out infinite;
-        }
-
-        .hero-bg .orb-1 {
-            width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(99,102,241,0.2), transparent);
-            top: -10%; left: -5%;
-            animation-delay: 0s;
-        }
-
-        .hero-bg .orb-2 {
-            width: 400px; height: 400px;
-            background: radial-gradient(circle, rgba(244,114,182,0.12), transparent);
-            bottom: -10%; right: -5%;
-            animation-delay: -3s;
-        }
-
-        .hero-bg .orb-3 {
-            width: 300px; height: 300px;
-            background: radial-gradient(circle, rgba(34,211,238,0.1), transparent);
-            top: 40%; left: 50%;
-            animation-delay: -5s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(30px, -20px) scale(1.05); }
-            66% { transform: translate(-20px, 15px) scale(0.95); }
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            max-width: 900px;
-            text-align: center;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 100px;
-            font-size: 0.75rem;
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-            background: var(--bg-card);
-        }
-
-        .hero-badge .dot {
-            width: 6px; height: 6px;
-            background: var(--green);
-            border-radius: 50%;
-            animation: pulse-dot 2s infinite;
-        }
-
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        .hero h1 {
-            font-size: clamp(2.8rem, 6vw, 5rem);
-            font-weight: 800;
-            line-height: 1.05;
-            letter-spacing: -0.04em;
-            margin-bottom: 1.5rem;
-        }
-
-        .hero h1 .line-2 {
-            font-family: 'Instrument Serif', serif;
-            font-style: italic;
-            font-weight: 400;
-            color: var(--accent-light);
-        }
-
-        .hero p {
-            font-size: 1.1rem;
-            color: var(--text-muted);
-            max-width: 600px;
-            margin: 0 auto 2.5rem;
-            font-weight: 300;
-        }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.8rem 1.8rem;
-            border-radius: 8px;
-            font-size: 0.88rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.3s;
-            font-family: 'Sora', sans-serif;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: #fff;
-            box-shadow: 0 0 30px var(--accent-glow);
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-light);
-            transform: translateY(-2px);
-            box-shadow: 0 0 50px rgba(99,102,241,0.3);
-        }
-
-        .btn-ghost {
-            background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-
-        .btn-ghost:hover {
-            border-color: var(--accent);
-            background: var(--accent-glow);
-        }
-
-        .hero-meta {
-            display: flex;
-            gap: 2rem;
-            justify-content: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .hero-meta .meta-item {
-            text-align: center;
-        }
-
-        .hero-meta .meta-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: var(--accent-light);
-        }
-
-        .hero-meta .meta-label {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-top: 0.2rem;
-        }
-
-        /* ── SECTIONS ── */
-        section {
-            padding: 6rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .section-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--accent);
-            margin-bottom: 0.8rem;
-        }
-
-        .section-title {
-            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            margin-bottom: 1rem;
-        }
-
-        .section-title em {
-            font-family: 'Instrument Serif', serif;
-            font-weight: 400;
-            color: var(--accent-light);
-        }
-
-        .section-desc {
-            color: var(--text-muted);
-            font-size: 1rem;
-            max-width: 700px;
-            font-weight: 300;
-            margin-bottom: 3rem;
-        }
-
-        /* ── DATASET SECTION ── */
-        .dataset-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .data-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 2rem;
-            transition: all 0.4s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .data-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-
-        .data-card:hover {
-            border-color: rgba(99,102,241,0.3);
-            transform: translateY(-4px);
-            background: var(--bg-card-hover);
-        }
-
-        .data-card:hover::before { opacity: 1; }
-
-        .data-card .card-icon {
-            width: 44px; height: 44px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            margin-bottom: 1.2rem;
-        }
-
-        .data-card h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 0.6rem;
-        }
-
-        .data-card p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            font-weight: 300;
-        }
-
-        .card-icon.purple { background: rgba(99,102,241,0.15); }
-        .card-icon.green { background: rgba(52,211,153,0.15); }
-        .card-icon.orange { background: rgba(251,146,60,0.15); }
-        .card-icon.rose { background: rgba(244,114,182,0.15); }
-
-        /* ── RESULTS ── */
-        .results-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .result-panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .result-panel.full-width {
-            grid-column: 1 / -1;
-        }
-
-        .panel-header {
-            padding: 1.2rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .panel-header h3 {
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        .panel-header .badge {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            padding: 0.2rem 0.6rem;
-            border-radius: 100px;
-            background: var(--accent-glow);
-            color: var(--accent-light);
-            border: 1px solid rgba(99,102,241,0.2);
-        }
-
-        .ranking-table {
-            width: 100%;
-            font-size: 0.82rem;
-        }
-
-        .ranking-table thead th {
-            padding: 0.7rem 1.2rem;
-            text-align: left;
-            font-weight: 500;
-            color: var(--text-muted);
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .ranking-table tbody tr {
-            transition: background 0.2s;
-        }
-
-        .ranking-table tbody tr:hover {
-            background: rgba(99,102,241,0.05);
-        }
-
-        .ranking-table td {
-            padding: 0.6rem 1.2rem;
-            border-bottom: 1px solid rgba(42,42,58,0.5);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.78rem;
-        }
-
-        .ranking-table .rank {
-            color: var(--text-muted);
-            font-weight: 400;
-            width: 40px;
-        }
-
-        .ranking-table .page-name {
-            font-family: 'Sora', sans-serif;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .ranking-table .score {
-            color: var(--accent-light);
-        }
-
-        .ranking-table tr:nth-child(1) .rank,
-        .ranking-table tr:nth-child(2) .rank,
-        .ranking-table tr:nth-child(3) .rank {
-            color: var(--gold);
-            font-weight: 600;
-        }
-
-        .score-bar {
-            display: inline-block;
-            height: 4px;
-            border-radius: 2px;
-            background: var(--accent);
-            margin-left: 8px;
-            vertical-align: middle;
-            opacity: 0.5;
-        }
-
-        /* ── BETA ANALYSIS ── */
-        .beta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .beta-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 2rem;
-        }
-
-        .beta-card h4 {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .beta-bars {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-        }
-
-        .beta-bar-row {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-
-        .beta-bar-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            width: 50px;
-            text-align: right;
-        }
-
-        .beta-bar-track {
-            flex: 1;
-            height: 24px;
-            background: var(--surface);
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .beta-bar-fill {
-            height: 100%;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            padding-left: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            color: rgba(255,255,255,0.8);
-            transition: width 1s ease;
-        }
-
-        /* ── INSIGHTS ── */
-        .insight-highlight {
-            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(99,102,241,0.08) 100%);
-            border: 1px solid var(--border);
-            border-left: 3px solid var(--accent);
-            border-radius: 0 12px 12px 0;
-            padding: 2rem;
-            margin: 2rem 0;
-        }
-
-        .insight-highlight .insight-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .insight-highlight p {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            font-weight: 300;
-        }
-
-        /* ── PERSONALIZED SECTION ── */
-        .theme-tabs {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .theme-tab {
-            padding: 0.6rem 1.4rem;
-            border-radius: 8px;
-            font-size: 0.82rem;
-            font-weight: 500;
-            cursor: pointer;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-muted);
-            font-family: 'Sora', sans-serif;
-            transition: all 0.3s;
-        }
-
-        .theme-tab.active {
-            background: var(--accent);
-            color: #fff;
-            border-color: var(--accent);
-        }
-
-        .theme-tab:hover:not(.active) {
-            border-color: var(--accent);
-            color: var(--text);
-        }
-
-        .theme-content {
-            display: none;
-        }
-
-        .theme-content.active {
-            display: block;
-        }
-
-        /* ── PERFORMANCE ── */
-        .perf-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .perf-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.8rem;
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .perf-card:hover {
-            border-color: rgba(99,102,241,0.3);
-            transform: translateY(-2px);
-        }
-
-        .perf-card .perf-label {
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-
-        .perf-card .perf-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2rem;
-            font-weight: 600;
-        }
-
-        .perf-card .perf-unit {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 0.3rem;
-        }
-
-        .perf-card.std .perf-value { color: var(--accent-light); }
-        .perf-card.comp .perf-value { color: var(--cyan); }
-        .perf-card.sav .perf-value { color: var(--green); }
-
-        /* ── CODE SECTION ── */
-        .code-block {
-            background: #0d0d14;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-            margin-top: 1.5rem;
-        }
-
-        .code-header {
-            padding: 0.8rem 1.2rem;
-            background: rgba(26,26,37,0.8);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .code-header .file-name {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .code-header .file-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-        }
-
-        .code-header .copy-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 0.3rem 0.8rem;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            cursor: pointer;
-            font-family: 'JetBrains Mono', monospace;
-            transition: all 0.3s;
-        }
-
-        .code-header .copy-btn:hover {
-            border-color: var(--accent);
-            color: var(--text);
-        }
-
-        .code-body {
-            padding: 1.2rem 1.5rem;
-            overflow-x: auto;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-
-        .code-body pre {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.76rem;
-            line-height: 1.8;
-            color: #c8c8d8;
-        }
-
-        .code-body::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .code-body::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .code-body::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        /* syntax */
-        .kw { color: #c792ea; }
-        .fn { color: #82aaff; }
-        .str { color: #c3e88d; }
-        .cm { color: #546e7a; }
-        .num { color: #f78c6c; }
-        .op { color: #89ddff; }
-        .var { color: #eeffff; }
-
-        /* ── PIPELINE ── */
-        .pipeline {
-            display: flex;
-            align-items: center;
-            gap: 0;
-            margin: 3rem 0;
-            overflow-x: auto;
-            padding-bottom: 1rem;
-        }
-
-        .pipeline-step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 140px;
-            text-align: center;
-        }
-
-        .pipeline-step .step-circle {
-            width: 56px; height: 56px;
-            border-radius: 50%;
-            border: 2px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            margin-bottom: 0.8rem;
-            background: var(--bg-card);
-            transition: all 0.3s;
-        }
-
-        .pipeline-step:hover .step-circle {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px var(--accent-glow);
-        }
-
-        .pipeline-step .step-title {
-            font-size: 0.78rem;
-            font-weight: 600;
-            margin-bottom: 0.2rem;
-        }
-
-        .pipeline-step .step-desc {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-        }
-
-        .pipeline-arrow {
-            color: var(--border);
-            font-size: 1.5rem;
-            flex-shrink: 0;
-            margin: 0 0.3rem;
-            margin-bottom: 2rem;
-        }
-
-        /* ── TECH STACK ── */
-        .tech-row {
-            display: flex;
-            gap: 0.8rem;
-            flex-wrap: wrap;
-            margin-top: 1.5rem;
-        }
-
-        .tech-chip {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.5rem 1rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-
-        .tech-chip:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
-        }
-
-        .tech-chip .tech-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-        }
-
-        /* ── AUTHORS ── */
-        .authors-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 2.5rem;
-            margin-top: 3rem;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .author-card {
-            display: flex;
-            align-items: center;
-            gap: 1.2rem;
-        }
-
-        .author-avatar {
-            width: 56px; height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        .author-card:nth-child(1) .author-avatar {
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-        }
-
-        .author-card:nth-child(2) .author-avatar {
-            background: linear-gradient(135deg, var(--cyan), var(--green));
-        }
-
-        .author-info .author-name {
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .author-info .author-role {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-        }
-
-        /* ── FOOTER ── */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 3rem 2rem;
-            text-align: center;
-        }
-
-        footer p {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-        }
-
-        footer a {
-            color: var(--accent-light);
-            text-decoration: none;
-        }
-
-        /* ── DIVIDER ── */
-        .section-divider {
-            max-width: 1200px;
-            margin: 0 auto;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, var(--border), transparent);
-        }
-
-        /* ── FORMULA ── */
-        .formula-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem 2rem;
-            text-align: center;
-            margin: 1.5rem 0;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.95rem;
-        }
-
-        .formula-box .formula-label {
-            font-size: 0.68rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-            font-family: 'Sora', sans-serif;
-        }
-
-        .formula-box .formula-text {
-            color: var(--accent-light);
-            font-weight: 500;
-        }
-
-        /* ── ANIMATE ON SCROLL ── */
-        .fade-in {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .fade-in.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 768px) {
-            nav ul { display: none; }
-            .results-container { grid-template-columns: 1fr; }
-            .beta-grid { grid-template-columns: 1fr; }
-            .perf-grid { grid-template-columns: 1fr; }
-            .authors-section { grid-template-columns: 1fr; }
-            .hero-meta { flex-wrap: wrap; gap: 1.5rem; }
-            .pipeline { flex-wrap: wrap; justify-content: center; }
-            .pipeline-arrow { display: none; }
+        :root{--bg:#06070a;--card:#0d0e13;--card2:#111219;--surface:#181920;--border:#1e2030;--border-l:#282a3a;--text:#e6e4e0;--dim:#8a8890;--faint:#4e4d55;--accent:#f0a050;--accent2:#e88a38;--accent-g:rgba(240,160,80,0.08);--teal:#4ec9b0;--teal-g:rgba(78,201,176,0.1);--coral:#e06060;--lav:#a088d0;--cream:#f5f0e8;--transition:cubic-bezier(0.16,1,0.3,1);}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        html{scroll-behavior:smooth;}
+        body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;line-height:1.7;overflow-x:hidden;cursor:none;}
+
+        /* ═══ LOADING SCREEN ═══ */
+        #loader{position:fixed;inset:0;z-index:100000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s,visibility 0.6s;}
+        #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+        .loader-logo{font-family:'Libre Baskerville',serif;font-size:2rem;font-weight:700;color:var(--cream);margin-bottom:2rem;overflow:hidden;}
+        .loader-logo span{display:inline-block;animation:loaderChar 0.5s forwards;opacity:0;transform:translateY(100%);}
+        @keyframes loaderChar{to{opacity:1;transform:translateY(0);}}
+        .loader-bar-track{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;}
+        .loader-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--teal));width:0;animation:loaderFill 1.8s ease-out forwards;}
+        @keyframes loaderFill{to{width:100%;}}
+        .loader-pct{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--faint);margin-top:0.8rem;}
+
+        /* ═══ CURSOR ═══ */
+        .cursor-dot{position:fixed;width:8px;height:8px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:99999;mix-blend-mode:difference;transition:transform 0.08s,width 0.2s,height 0.2s;}
+        .cursor-dot.click{width:14px;height:14px;margin-left:-3px;margin-top:-3px;}
+        .cursor-ring{position:fixed;width:36px;height:36px;border:1.5px solid rgba(240,160,80,0.35);border-radius:50%;pointer-events:none;z-index:99998;transition:width 0.3s,height 0.3s,border-color 0.3s,background 0.3s;}
+        .cursor-ring.hover{width:56px;height:56px;border-color:var(--accent);}
+        .cursor-ring.text{width:4px;height:20px;border-radius:2px;background:var(--accent);border:none;}
+
+        /* ═══ MOUSE TRAIL ═══ */
+        .trail-dot{position:fixed;width:4px;height:4px;border-radius:50%;background:var(--accent);pointer-events:none;z-index:99996;opacity:0.3;transition:opacity 0.5s;}
+
+        /* ═══ SCROLL PROGRESS ═══ */
+        .scroll-progress{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--teal),var(--lav));z-index:10001;width:0%;}
+
+        /* ═══ SIDE NAV DOTS ═══ */
+        .side-nav{position:fixed;right:1.5rem;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:1rem;}
+        .side-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--faint);background:transparent;cursor:none;transition:all 0.3s;position:relative;}
+        .side-dot.active{border-color:var(--accent);background:var(--accent);box-shadow:0 0 12px rgba(240,160,80,0.4);}
+        .side-dot::after{content:attr(data-label);position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:0.62rem;color:var(--faint);white-space:nowrap;opacity:0;transition:opacity 0.3s,right 0.3s;pointer-events:none;font-family:'IBM Plex Mono',monospace;}
+        .side-dot:hover::after{opacity:1;right:24px;}
+
+        /* ═══ BACK TO TOP ═══ */
+        .back-top{position:fixed;bottom:2rem;right:2rem;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;transform:translateY(20px);transition:all 0.3s;cursor:none;}
+        .back-top.vis{opacity:1;transform:translateY(0);}
+        .back-top:hover{border-color:var(--accent);background:var(--card2);box-shadow:0 0 20px var(--accent-g);}
+        .back-top svg{width:18px;height:18px;stroke:var(--dim);transition:stroke 0.3s;}
+        .back-top:hover svg{stroke:var(--accent);}
+
+        /* ═══ TOAST ═══ */
+        .toast{position:fixed;bottom:3rem;left:50%;transform:translateX(-50%) translateY(20px);background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 1.2rem;font-size:0.78rem;color:var(--cream);z-index:100001;opacity:0;transition:all 0.4s var(--transition);pointer-events:none;display:flex;align-items:center;gap:0.5rem;backdrop-filter:blur(10px);}
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+        .toast .toast-icon{color:var(--teal);}
+
+        /* ═══ GRAIN ═══ */
+        body::after{content:'';position:fixed;inset:0;opacity:0.02;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none;z-index:10000;}
+        ::selection{background:var(--accent);color:var(--bg);}
+        a,button{cursor:none;}
+
+        /* ═══ NAV ═══ */
+        nav{position:fixed;top:0;width:100%;z-index:1000;padding:0 3rem;height:56px;display:flex;align-items:center;backdrop-filter:blur(20px) saturate(1.3);background:rgba(6,7,10,0.7);border-bottom:1px solid rgba(30,32,48,0.5);transition:all 0.3s;}
+        nav.scrolled{background:rgba(6,7,10,0.92);box-shadow:0 4px 30px rgba(0,0,0,0.3);}
+        .nav-in{max-width:1200px;width:100%;margin:0 auto;display:flex;justify-content:space-between;align-items:center;}
+        .nav-logo{font-family:'IBM Plex Mono',monospace;font-size:0.82rem;font-weight:600;color:var(--accent);transition:transform 0.3s;}
+        .nav-logo:hover{transform:scale(1.05);}
+        .nav-logo span{color:var(--faint);font-weight:400;}
+        .nav-links{list-style:none;display:flex;gap:2rem;}
+        .nav-links a{color:var(--dim);text-decoration:none;font-size:0.78rem;font-weight:500;transition:color 0.25s;position:relative;padding:0.2rem 0;}
+        .nav-links a::after{content:'';position:absolute;bottom:-2px;left:50%;right:50%;height:1.5px;background:var(--accent);transition:left 0.3s,right 0.3s;}
+        .nav-links a:hover,.nav-links a.active{color:var(--cream);}
+        .nav-links a:hover::after,.nav-links a.active::after{left:0;right:0;}
+
+        /* ═══ KBD HINTS ═══ */
+        .kbd-hint{position:fixed;bottom:2rem;left:2rem;z-index:999;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--faint);opacity:0.5;transition:opacity 0.3s;}
+        .kbd{display:inline-block;padding:0.15rem 0.4rem;background:var(--card);border:1px solid var(--border);border-radius:3px;font-size:0.55rem;margin:0 0.1rem;}
+
+        /* ═══ PARTICLES ═══ */
+        #particles{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+        /* ═══ HERO ═══ */
+        .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;padding:8rem 3rem 5rem;overflow:hidden;}
+        .hero-orb{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none;will-change:transform;}
+        .hero-orb.o1{width:600px;height:600px;background:radial-gradient(circle,rgba(240,160,80,0.08),transparent);top:-15%;left:-10%;animation:orb 12s ease-in-out infinite;}
+        .hero-orb.o2{width:400px;height:400px;background:radial-gradient(circle,rgba(78,201,176,0.06),transparent);bottom:-10%;right:-5%;animation:orb 12s ease-in-out infinite 4s;}
+        .hero-orb.o3{width:300px;height:300px;background:radial-gradient(circle,rgba(160,136,208,0.06),transparent);top:50%;left:60%;animation:orb 12s ease-in-out infinite 8s;}
+        @keyframes orb{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(40px,-30px) scale(1.08);}66%{transform:translate(-25px,20px) scale(0.92);}}
+
+        .hero-content{position:relative;z-index:2;max-width:1000px;text-align:center;}
+        .hero-tag{display:inline-flex;align-items:center;gap:0.5rem;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);margin-bottom:2.5rem;opacity:0;animation:fadeUp 0.8s 0.3s forwards;}
+        .hero-tag .pulse{width:7px;height:7px;background:var(--teal);border-radius:50%;animation:pulseDot 2s infinite;}
+        @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(78,201,176,0.5)}50%{box-shadow:0 0 0 8px rgba(78,201,176,0)}}
+
+        .hero h1{font-family:'Libre Baskerville',serif;font-size:clamp(2.8rem,5.5vw,4.6rem);font-weight:700;line-height:1.1;letter-spacing:-0.03em;margin-bottom:1.5rem;position:relative;}
+        .hero h1 .char{display:inline-block;opacity:0;transform:translateY(100%);animation:charIn 0.6s forwards;}
+        .hero h1 em{font-style:italic;font-weight:400;color:var(--accent);}
+        .hero h1 em .char{color:var(--accent);}
+        @keyframes charIn{to{opacity:1;transform:translateY(0);}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+
+        /* GLITCH on hover */
+        .hero h1:hover .char{animation:glitch 0.3s ease;}
+        @keyframes glitch{
+            0%{transform:translate(0);}
+            20%{transform:translate(-2px,2px);color:var(--coral);}
+            40%{transform:translate(2px,-1px);color:var(--teal);}
+            60%{transform:translate(-1px,-2px);color:var(--lav);}
+            80%{transform:translate(1px,1px);}
+            100%{transform:translate(0);color:inherit;}
+        }
+
+        .hero-desc{font-size:1.05rem;color:var(--dim);max-width:580px;margin:0 auto 2.5rem;font-weight:300;opacity:0;animation:fadeUp 0.8s 1.4s forwards;}
+        .hero-actions{display:flex;gap:0.8rem;justify-content:center;opacity:0;animation:fadeUp 0.8s 1.7s forwards;}
+
+        .mag-btn{position:relative;display:inline-flex;align-items:center;gap:0.5rem;padding:0.8rem 2rem;border-radius:50px;font-size:0.85rem;font-weight:600;text-decoration:none;font-family:'Outfit',sans-serif;border:none;transition:transform 0.15s,box-shadow 0.3s;overflow:hidden;}
+        .mag-btn::before{content:'';position:absolute;inset:0;border-radius:50px;opacity:0;transition:opacity 0.3s;}
+        .mag-btn.primary{color:var(--bg);background:var(--accent);}
+        .mag-btn.primary::before{background:linear-gradient(45deg,var(--accent2),var(--accent),#f0c070);}
+        .mag-btn.primary:hover::before{opacity:1;}
+        .mag-btn.primary:hover{box-shadow:0 0 60px rgba(240,160,80,0.3);}
+        .mag-btn.ghost{color:var(--dim);border:1px solid var(--border);background:transparent;}
+        .mag-btn.ghost:hover{color:var(--cream);border-color:var(--accent);}
+        .mag-btn span{position:relative;z-index:1;}
+
+        .hero-counters{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:4rem;border-radius:12px;overflow:hidden;opacity:0;animation:fadeUp 0.8s 2s forwards;}
+        .counter-cell{background:var(--card);padding:1.5rem;text-align:center;position:relative;overflow:hidden;transition:background 0.3s;}
+        .counter-cell:hover{background:var(--card2);}
+        .counter-cell::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(240,160,80,0.04),transparent);opacity:0;transition:opacity 0.4s;}
+        .counter-cell:hover::after{opacity:1;}
+        .counter-val{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--cream);}
+        .counter-label{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint);margin-top:0.2rem;}
+
+        /* ═══ SECTIONS ═══ */
+        section{max-width:1200px;margin:0 auto;padding:7rem 3rem;position:relative;}
+        .divider{max-width:1200px;margin:0 auto;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);position:relative;overflow:hidden;}
+        .divider::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:dividerGlow 4s infinite;}
+        @keyframes dividerGlow{0%{left:-50%;}100%{left:150%;}}
+
+        .s-num{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:1rem;display:flex;align-items:center;gap:0.6rem;}
+        .s-num::after{content:'';flex:1;max-width:50px;height:1px;background:var(--border-l);}
+        .s-title{font-family:'Libre Baskerville',serif;font-size:clamp(1.8rem,3.2vw,2.6rem);font-weight:700;letter-spacing:-0.02em;margin-bottom:0.6rem;line-height:1.2;}
+        .s-title em{font-weight:400;font-style:italic;color:var(--accent);}
+        .s-desc{color:var(--dim);font-size:0.92rem;max-width:540px;font-weight:300;margin-bottom:3rem;}
+
+        /* ═══ REVEAL ═══ */
+        .rv{opacity:0;transform:translateY(32px);transition:opacity 0.8s var(--transition),transform 0.8s var(--transition);}
+        .rv.vis{opacity:1;transform:none;}
+        .rv.d1{transition-delay:0.1s;}.rv.d2{transition-delay:0.2s;}.rv.d3{transition-delay:0.3s;}.rv.d4{transition-delay:0.4s;}
+
+        /* ═══ TILT CARDS ═══ */
+        .tilt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;}
+        .tilt-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:2rem 1.5rem;transition:transform 0.15s,box-shadow 0.3s,border-color 0.3s;position:relative;overflow:hidden;}
+        .tilt-card::after{content:'';position:absolute;inset:-1px;border-radius:14px;padding:1px;background:linear-gradient(135deg,transparent,transparent,var(--accent),transparent,transparent);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity 0.5s;}
+        .tilt-card:hover::after{opacity:1;}
+        .tilt-card:hover{box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+        .tc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:1.2rem;transition:transform 0.3s;}
+        .tilt-card:hover .tc-icon{transform:scale(1.15) rotate(-5deg);}
+        .tilt-card h3{font-size:0.9rem;font-weight:700;margin-bottom:0.4rem;}
+        .tilt-card p{font-size:0.78rem;color:var(--dim);font-weight:300;line-height:1.7;}
+
+        /* ═══ GRAPH ═══ */
+        .graph-container{width:100%;height:500px;background:var(--card);border:1px solid var(--border);border-radius:14px;position:relative;overflow:hidden;margin:2rem 0;}
+        #interactiveGraph{width:100%;height:100%;}
+        .graph-legend{position:absolute;bottom:1rem;left:1rem;font-size:0.68rem;color:var(--faint);font-family:'IBM Plex Mono',monospace;background:rgba(6,7,10,0.85);padding:0.6rem 1rem;border-radius:8px;backdrop-filter:blur(10px);line-height:1.6;}
+        .graph-legend strong{color:var(--accent);}
+        .graph-legend .tl{color:var(--teal);}
+        .graph-controls{position:absolute;top:1rem;right:1rem;display:flex;gap:0.4rem;}
+        .graph-ctrl{background:rgba(6,7,10,0.85);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.7rem;font-size:0.65rem;color:var(--dim);font-family:'IBM Plex Mono',monospace;cursor:none;transition:all 0.25s;backdrop-filter:blur(10px);}
+        .graph-ctrl:hover{border-color:var(--accent);color:var(--accent);}
+        .graph-ctrl.active{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+
+        /* ═══ PIPELINE ═══ */
+        .pipe-track{display:flex;align-items:stretch;margin:3rem 0 2rem;position:relative;}
+        .pipe-track::before{content:'';position:absolute;top:30px;left:50px;right:50px;height:2px;background:repeating-linear-gradient(90deg,var(--border) 0,var(--border) 8px,transparent 8px,transparent 16px);}
+        .pipe-step{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;z-index:1;}
+        .pipe-dot{width:60px;height:60px;border-radius:50%;background:var(--card);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:0.9rem;transition:all 0.4s var(--transition);}
+        .pipe-step:hover .pipe-dot{border-color:var(--accent);transform:scale(1.15);box-shadow:0 0 40px var(--accent-g),0 0 80px rgba(240,160,80,0.05);}
+        .pipe-lbl{font-size:0.78rem;font-weight:600;}
+        .pipe-sub{font-size:0.62rem;color:var(--faint);font-family:'IBM Plex Mono',monospace;}
+
+        /* ═══ FORMULA ═══ */
+        .formula-row{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--border);border-radius:12px;overflow:hidden;margin:2rem 0;}
+        .formula-cell{background:var(--card);padding:1.8rem;text-align:center;transition:background 0.3s;}
+        .formula-cell:hover{background:var(--card2);}
+        .formula-lbl{font-family:'IBM Plex Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--faint);margin-bottom:0.5rem;}
+        .formula-expr{font-family:'IBM Plex Mono',monospace;font-size:0.95rem;font-weight:500;color:var(--accent);transition:transform 0.3s,text-shadow 0.3s;}
+        .formula-cell:hover .formula-expr{transform:scale(1.05);text-shadow:0 0 20px rgba(240,160,80,0.3);}
+
+        /* ═══ CHIPS ═══ */
+        .chips{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1.5rem;}
+        .chip{padding:0.42rem 0.9rem;background:var(--card);border:1px solid var(--border);border-radius:100px;font-size:0.72rem;font-weight:500;display:flex;align-items:center;gap:0.35rem;transition:all 0.3s;}
+        .chip:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.2);}
+        .chip-dot{width:6px;height:6px;border-radius:50%;}
+
+        /* ═══ RESULTS ═══ */
+        .r-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+        .r-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+        .r-panel.span{grid-column:1/-1;}
+        .r-head{padding:1rem 1.4rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+        .r-head h3{font-size:0.82rem;font-weight:600;}
+        .r-badge{font-family:'IBM Plex Mono',monospace;font-size:0.6rem;padding:0.2rem 0.6rem;border-radius:4px;background:var(--accent-g);color:var(--accent);}
+        .rt{width:100%;border-collapse:collapse;font-size:0.78rem;}
+        .rt thead th{padding:0.55rem 1.2rem;text-align:left;font-weight:500;color:var(--faint);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid var(--border);}
+        .rt tbody tr{transition:all 0.25s;position:relative;}
+        .rt tbody tr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width 0.3s;opacity:0.8;}
+        .rt tbody tr:hover::before{width:3px;}
+        .rt tbody tr:hover{background:rgba(240,160,80,0.04);}
+        .rt tbody tr:hover td{color:var(--cream);}
+        .rt td{padding:0.5rem 1.2rem;border-bottom:1px solid rgba(30,32,48,0.4);transition:color 0.2s;position:relative;}
+        .rt .rk{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--faint);width:36px;}
+        .rt tr:nth-child(-n+3) .rk{color:var(--accent);font-weight:600;}
+        .rt .pg{font-weight:600;font-size:0.8rem;}
+        .rt .sc{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--teal);}
+        .rt .dt{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--teal);}
+        .score-bar{display:inline-block;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--teal));margin-left:6px;vertical-align:middle;opacity:0.4;width:0;transition:width 1s var(--transition);}
+
+        /* ═══ ROW TOOLTIP ═══ */
+        .row-tip{position:absolute;left:50%;top:-36px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.6rem;font-size:0.62rem;color:var(--cream);white-space:nowrap;opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:10;font-family:'IBM Plex Mono',monospace;}
+        .rt tbody tr:hover .row-tip{opacity:1;}
+
+        /* ═══ CALLOUT ═══ */
+        .callout{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:1.6rem 1.8rem;margin:1.5rem 0;transition:all 0.3s;position:relative;overflow:hidden;}
+        .callout::before{content:'';position:absolute;top:0;left:0;bottom:0;width:0;background:linear-gradient(90deg,rgba(240,160,80,0.05),transparent);transition:width 0.5s;}
+        .callout:hover::before{width:100%;}
+        .callout:hover{border-left-color:var(--teal);background:var(--card2);}
+        .callout-t{font-size:0.85rem;font-weight:700;margin-bottom:0.4rem;display:flex;align-items:center;gap:0.4rem;position:relative;}
+        .callout p{font-size:0.82rem;color:var(--dim);font-weight:300;line-height:1.8;position:relative;}
+        .callout strong{color:var(--cream);font-weight:600;}
+
+        /* ═══ BETA SECTION ═══ */
+        .beta-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2rem;}
+        .beta-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.8rem;}
+        .beta-box h4{font-size:0.85rem;font-weight:700;margin-bottom:1.2rem;}
+        .bar-group{display:flex;flex-direction:column;gap:0.4rem;}
+        .bar-row{display:flex;align-items:center;gap:0.6rem;}
+        .bar-lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--faint);width:44px;text-align:right;flex-shrink:0;}
+        .bar-track{flex:1;height:26px;background:var(--surface);border-radius:4px;overflow:hidden;position:relative;}
+        .bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:10px;font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:rgba(255,255,255,0.8);width:0;transition:width 1.2s var(--transition);position:relative;overflow:hidden;}
+        .bar-fill::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);animation:barShimmer 2s infinite;}
+        @keyframes barShimmer{to{left:200%;}}
+
+        .perm-row{display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0;border-bottom:1px solid rgba(30,32,48,0.3);font-size:0.75rem;transition:all 0.2s;}
+        .perm-row:hover{background:rgba(240,160,80,0.03);padding-left:0.4rem;}
+        .perm-row:last-child{border-bottom:none;}
+        .perm-b{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--faint);width:44px;flex-shrink:0;}
+        .perm-m{display:flex;gap:0.4rem;font-size:0.72rem;}
+        .perm-m .gold{color:var(--accent);font-weight:700;}
+
+        /* ═══ INTERACTIVE BETA SLIDER ═══ */
+        .beta-slider-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.8rem;margin-top:1.5rem;}
+        .beta-slider-wrap h4{font-size:0.85rem;font-weight:700;margin-bottom:1rem;}
+        .slider-row{display:flex;align-items:center;gap:1rem;}
+        .beta-slider{-webkit-appearance:none;appearance:none;flex:1;height:4px;background:var(--surface);border-radius:4px;outline:none;cursor:none;}
+        .beta-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--bg);cursor:none;box-shadow:0 0 10px rgba(240,160,80,0.3);transition:transform 0.2s;}
+        .beta-slider::-webkit-slider-thumb:hover{transform:scale(1.2);}
+        .beta-val-display{font-family:'IBM Plex Mono',monospace;font-size:1.2rem;font-weight:600;color:var(--accent);min-width:60px;text-align:center;}
+        .beta-result{margin-top:1rem;display:grid;grid-template-columns:repeat(5,1fr);gap:0.4rem;}
+        .beta-result-cell{background:var(--surface);border-radius:6px;padding:0.5rem;text-align:center;transition:all 0.3s;}
+        .beta-result-cell.top1{background:rgba(240,160,80,0.15);border:1px solid rgba(240,160,80,0.3);}
+        .beta-result-cell .brc-rank{font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--faint);}
+        .beta-result-cell .brc-name{font-size:0.68rem;font-weight:600;margin-top:0.1rem;}
+        .beta-result-cell .brc-score{font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--teal);margin-top:0.15rem;}
+        .beta-result-iter{margin-top:0.8rem;font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--dim);text-align:center;}
+
+        /* ═══ RADAR CHART ═══ */
+        .radar-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-top:1.5rem;display:flex;align-items:center;justify-content:center;}
+        #radarCanvas{max-width:100%;}
+
+        /* ═══ TABS ═══ */
+        .tab-row{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+        .tab-btn{padding:0.7rem 1.4rem;font-size:0.78rem;font-weight:500;cursor:none;border:none;background:transparent;color:var(--faint);font-family:'Outfit',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.25s,border-color 0.25s;}
+        .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+        .tab-btn:hover:not(.active){color:var(--dim);}
+        .tab-panel{display:none;}.tab-panel.active{display:block;animation:tabFadeIn 0.4s ease;}
+        @keyframes tabFadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+        /* ═══ PERF ═══ */
+        .perf-row{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--border);border-radius:12px;overflow:hidden;margin-top:2rem;}
+        .perf-cell{background:var(--card);padding:2rem;text-align:center;transition:background 0.3s;position:relative;overflow:hidden;}
+        .perf-cell:hover{background:var(--card2);}
+        .p-lbl{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--faint);margin-bottom:0.4rem;}
+        .p-val{font-family:'IBM Plex Mono',monospace;font-size:2.2rem;font-weight:700;transition:transform 0.3s;}
+        .perf-cell:hover .p-val{transform:scale(1.08);}
+        .p-sub{font-size:0.72rem;color:var(--faint);margin-top:0.2rem;}
+        .p-a{color:var(--accent);}.p-t{color:var(--teal);}.p-c{color:var(--coral);}
+
+        /* ═══ CODE ═══ */
+        .code-wrap{background:#06070a;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+        .code-top{padding:0.7rem 1.2rem;background:rgba(13,14,19,0.9);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+        .code-fn{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--faint);display:flex;align-items:center;gap:0.5rem;}
+        .code-dt{width:8px;height:8px;border-radius:50%;}
+        .code-actions{display:flex;gap:0.4rem;}
+        .copy-btn,.lines-btn{background:transparent;border:1px solid var(--border);color:var(--faint);padding:0.25rem 0.7rem;border-radius:4px;font-size:0.62rem;font-family:'IBM Plex Mono',monospace;transition:all 0.25s;cursor:none;}
+        .copy-btn:hover,.lines-btn:hover{border-color:var(--accent);color:var(--accent);}
+        .code-scroll{padding:1.2rem 1.4rem;overflow:auto;max-height:480px;counter-reset:line;}
+        .code-scroll::-webkit-scrollbar{width:5px;height:5px;}
+        .code-scroll::-webkit-scrollbar-track{background:transparent;}
+        .code-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+        .code-scroll pre{font-family:'IBM Plex Mono',monospace;font-size:0.74rem;line-height:1.85;color:#b0ada8;}
+        .code-scroll.show-lines pre .code-line{display:block;}
+        .code-scroll.show-lines pre .code-line::before{counter-increment:line;content:counter(line);display:inline-block;width:2.5rem;text-align:right;margin-right:1rem;color:var(--border-l);font-size:0.65rem;}
+        .kw{color:#c191e0;}.fn{color:#79b8d1;}.str{color:#a8c77b;}.cm{color:#484646;font-style:italic;}.num{color:#d4a054;}.op{color:#7eb8b0;}
+
+        /* ═══ CONCLUSION ═══ */
+        .conc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--border);border-radius:12px;overflow:hidden;}
+        .conc-card{background:var(--card);padding:2.2rem;transition:all 0.3s;position:relative;overflow:hidden;}
+        .conc-card:hover{background:var(--card2);}
+        .conc-card::before{content:'';position:absolute;top:-50%;right:-50%;width:100%;height:100%;background:radial-gradient(circle,rgba(240,160,80,0.03),transparent);opacity:0;transition:opacity 0.5s;}
+        .conc-card:hover::before{opacity:1;}
+        .conc-card .cc-icon{font-size:1.2rem;margin-bottom:1rem;display:inline-block;transition:transform 0.3s;}
+        .conc-card:hover .cc-icon{transform:scale(1.2) rotate(-10deg);}
+        .conc-card h3{font-size:0.9rem;font-weight:700;margin-bottom:0.4rem;position:relative;}
+        .conc-card p{font-size:0.78rem;color:var(--dim);font-weight:300;line-height:1.7;position:relative;}
+
+        /* ═══ AUTHORS ═══ */
+        .authors-bar{display:flex;align-items:center;justify-content:space-between;margin-top:3rem;padding:2rem;background:var(--card);border:1px solid var(--border);border-radius:12px;transition:border-color 0.3s;}
+        .authors-bar:hover{border-color:rgba(240,160,80,0.2);}
+        .authors-left{display:flex;gap:2.5rem;}
+        .a-person{display:flex;align-items:center;gap:0.9rem;}
+        .a-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--bg);transition:transform 0.3s,box-shadow 0.3s;}
+        .a-person:hover .a-av{transform:scale(1.1) rotate(5deg);box-shadow:0 0 20px rgba(240,160,80,0.3);}
+        .a-person:first-child .a-av{background:var(--accent);}
+        .a-person:last-child .a-av{background:var(--teal);}
+        .a-name{font-weight:600;font-size:0.88rem;}
+        .a-role{font-size:0.68rem;color:var(--faint);}
+        .authors-right{text-align:right;font-size:0.78rem;color:var(--dim);}
+        .authors-right strong{color:var(--text);font-weight:600;}
+
+        /* ═══ FOOTER ═══ */
+        footer{border-top:1px solid var(--border);padding:2.5rem;text-align:center;}
+        footer p{font-size:0.72rem;color:var(--faint);}
+        footer a{color:var(--accent);text-decoration:none;}
+        footer a:hover{text-decoration:underline;}
+
+        /* ═══ EASTER EGG ═══ */
+        .easter-egg{position:fixed;inset:0;z-index:200000;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;opacity:0;pointer-events:none;transition:opacity 0.5s;}
+        .easter-egg.show{opacity:1;pointer-events:auto;}
+        .easter-egg h2{font-family:'Libre Baskerville',serif;font-size:2rem;color:var(--accent);animation:float 3s ease-in-out infinite;}
+        .easter-egg p{color:var(--dim);font-size:0.9rem;}
+        @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+
+        /* ═══ RESPONSIVE ═══ */
+        @media(max-width:900px){
+            .tilt-grid{grid-template-columns:1fr 1fr;}.r-grid{grid-template-columns:1fr;}.beta-cols{grid-template-columns:1fr;}.perf-row{grid-template-columns:1fr;}.conc-grid{grid-template-columns:1fr;}.hero-counters{grid-template-columns:1fr 1fr;}.authors-bar{flex-direction:column;gap:1.5rem;text-align:center;}.authors-left{flex-direction:column;gap:1rem;align-items:center;}.authors-right{text-align:center;}
+            .cursor-dot,.cursor-ring,.trail-dot{display:none!important;}body{cursor:auto;}a,button{cursor:pointer;}.side-nav,.kbd-hint{display:none;}
+            .beta-result{grid-template-columns:repeat(3,1fr);}
+        }
+        @media(max-width:600px){
+            .tilt-grid{grid-template-columns:1fr;}.hero-counters{grid-template-columns:1fr 1fr;}.formula-row{grid-template-columns:1fr;}.nav-links{display:none;}section{padding:5rem 1.5rem;}.hero{padding:6rem 1.5rem 4rem;}.graph-container{height:350px;}
+            .beta-result{grid-template-columns:1fr 1fr;}
         }
     </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-    <div class="nav-inner">
-        <div class="logo">PageRank<span>×Wikispeedia</span></div>
-        <ul>
-            <li><a href="#dataset">Dataset</a></li>
-            <li><a href="#methode">Méthode</a></li>
-            <li><a href="#resultats">Résultats</a></li>
-            <li><a href="#personnalise">Personnalisé</a></li>
-            <li><a href="#code">Code</a></li>
+<!-- LOADER -->
+<div id="loader">
+    <div class="loader-logo" id="loaderLogo"></div>
+    <div class="loader-bar-track"><div class="loader-bar-fill"></div></div>
+    <div class="loader-pct" id="loaderPct">0%</div>
+</div>
+
+<!-- SYSTEM -->
+<div class="scroll-progress" id="scrollProgress"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<canvas id="particles"></canvas>
+<div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toastMsg">Copié !</span></div>
+
+<!-- SIDE NAV -->
+<div class="side-nav" id="sideNav">
+    <button class="side-dot active" data-label="Accueil" data-section="hero" onclick="scrollTo2('.hero')"></button>
+    <button class="side-dot" data-label="Dataset" data-section="dataset" onclick="scrollTo2('#dataset')"></button>
+    <button class="side-dot" data-label="Méthode" data-section="methode" onclick="scrollTo2('#methode')"></button>
+    <button class="side-dot" data-label="Résultats" data-section="resultats" onclick="scrollTo2('#resultats')"></button>
+    <button class="side-dot" data-label="Personnalisé" data-section="personnalise" onclick="scrollTo2('#personnalise')"></button>
+    <button class="side-dot" data-label="Code" data-section="code" onclick="scrollTo2('#code')"></button>
+    <button class="side-dot" data-label="Conclusion" data-section="conclusion" onclick="scrollTo2('#conclusion')"></button>
+</div>
+
+<!-- BACK TO TOP -->
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 19V5m-7 7l7-7 7 7"/></svg>
+</button>
+
+<!-- KBD HINT -->
+<div class="kbd-hint"><kbd class="kbd">T</kbd> haut · <kbd class="kbd">↓</kbd><kbd class="kbd">↑</kbd> naviguer</div>
+
+<!-- EASTER EGG -->
+<div class="easter-egg" id="easterEgg"><h2>🎉 PageRank Master !</h2><p>Tu as trouvé l'easter egg — tape ↑↑↓↓←→←→</p><button class="mag-btn ghost" onclick="document.getElementById('easterEgg').classList.remove('show')" style="margin-top:1rem;"><span>Fermer</span></button></div>
+
+<nav id="mainNav">
+    <div class="nav-in">
+        <div class="nav-logo">PR<span>×wikispeedia</span></div>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#dataset" data-section="dataset">Dataset</a></li>
+            <li><a href="#methode" data-section="methode">Méthode</a></li>
+            <li><a href="#resultats" data-section="resultats">Résultats</a></li>
+            <li><a href="#personnalise" data-section="personnalise">Personnalisé</a></li>
+            <li><a href="#code" data-section="code">Code</a></li>
         </ul>
     </div>
 </nav>
 
-<!-- HERO -->
-<header class="hero">
-    <div class="hero-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
+<!-- ═══ HERO ═══ -->
+<header class="hero" data-spy="hero">
+    <div class="hero-orb o1" id="orb1"></div><div class="hero-orb o2" id="orb2"></div><div class="hero-orb o3" id="orb3"></div>
     <div class="hero-content">
-        <div class="hero-badge">
-            <span class="dot"></span>
-            Projet Big Data — IS4
-        </div>
-        <h1>
-            Analyse du PageRank<br>
-            <span class="line-2">sur Wikispeedia</span>
-        </h1>
-        <p>Implémentation et étude comparative de l'algorithme PageRank — versions standard et personnalisée — sur le graphe de navigation Wikispeedia de Stanford.</p>
+        <div class="hero-tag"><span class="pulse"></span> Projet Big Data — IS4</div>
+        <h1 id="heroTitle">Analyse du PageRank<br><em>sur Wikispeedia</em></h1>
+        <p class="hero-desc">Implémentation et étude comparative de l'algorithme PageRank — versions standard et personnalisée — sur le graphe de navigation Wikispeedia de Stanford.</p>
         <div class="hero-actions">
-            <a href="#resultats" class="btn btn-primary">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                Explorer les résultats
-            </a>
-            <a href="#code" class="btn btn-ghost">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-                Voir le code
-            </a>
+            <a href="#resultats" class="mag-btn primary"><span>Explorer les résultats →</span></a>
+            <a href="#code" class="mag-btn ghost"><span>&lt;/&gt; Code source</span></a>
         </div>
-        <div class="hero-meta">
-            <div class="meta-item">
-                <div class="meta-value">4 169</div>
-                <div class="meta-label">Pages analysées</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-value">51 318</div>
-                <div class="meta-label">Chemins parcourus</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-value">26</div>
-                <div class="meta-label">Itérations (β=0.85)</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-value">2.55s</div>
-                <div class="meta-label">Temps d'exécution</div>
-            </div>
+        <div class="hero-counters">
+            <div class="counter-cell"><div class="counter-val" data-target="4169">0</div><div class="counter-label">Pages analysées</div></div>
+            <div class="counter-cell"><div class="counter-val" data-target="51318">0</div><div class="counter-label">Chemins parcourus</div></div>
+            <div class="counter-cell"><div class="counter-val" data-target="26">0</div><div class="counter-label">Itérations (β=0.85)</div></div>
+            <div class="counter-cell"><div class="counter-val" data-target="2.55" data-decimal="true" data-suffix="s">0</div><div class="counter-label">Temps d'exécution</div></div>
         </div>
     </div>
 </header>
+<div class="divider"></div>
 
-<div class="section-divider"></div>
-
-<!-- DATASET -->
-<section id="dataset">
-    <div class="fade-in">
-        <div class="section-label">01 — Dataset</div>
-        <div class="section-title">Le jeu de données <em>Wikispeedia</em></div>
-        <div class="section-desc">Un graphe réel construit à partir des parcours de navigation des joueurs sur une version condensée de Wikipédia, issue de l'Université de Stanford.</div>
-    </div>
-
-    <div class="dataset-grid fade-in">
-        <div class="data-card">
-            <div class="card-icon purple">📄</div>
-            <h3>paths_finished.tsv</h3>
-            <p>Fichier principal contenant les 51 318 parcours de navigation terminés avec succès par les joueurs.</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon green">🔗</div>
-            <h3>4 604 articles</h3>
-            <p>Version condensée de Wikipédia utilisée dans le jeu, avec liens internes entre les articles.</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon orange">📊</div>
-            <h3>4 169 pages uniques</h3>
-            <p>Nombre de pages distinctes visitées dans les chemins, formant les nœuds de notre graphe.</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon rose">🧭</div>
-            <h3>Colonne 4 : les chemins</h3>
-            <p>Séquences de navigation (séparées par ";") avec gestion des retours arrière via le symbole "&lt;".</p>
-        </div>
+<!-- ═══ DATASET ═══ -->
+<section id="dataset" data-spy="dataset">
+    <div class="rv"><div class="s-num">01 — Dataset</div><div class="s-title">Le jeu de données <em>Wikispeedia</em></div><div class="s-desc">Un graphe réel construit à partir des parcours de navigation des joueurs sur une version condensée de Wikipédia.</div></div>
+    <div class="tilt-grid rv d1">
+        <div class="tilt-card" data-tilt><div class="tc-icon" style="background:var(--accent-g);">📄</div><h3>paths_finished.tsv</h3><p>51 318 parcours terminés avec succès par les joueurs de Wikispeedia.</p></div>
+        <div class="tilt-card" data-tilt><div class="tc-icon" style="background:var(--teal-g);">🔗</div><h3>4 604 articles</h3><p>Version condensée de Wikipédia utilisée dans le jeu, avec liens internes.</p></div>
+        <div class="tilt-card" data-tilt><div class="tc-icon" style="background:rgba(224,96,96,0.1);">📊</div><h3>4 169 pages uniques</h3><p>Pages distinctes visitées dans les chemins, formant les nœuds du graphe.</p></div>
+        <div class="tilt-card" data-tilt><div class="tc-icon" style="background:rgba(160,136,208,0.1);">🧭</div><h3>Chemins séquentiels</h3><p>Séquences séparées par « ; » avec retours arrière via « &lt; ».</p></div>
     </div>
 </section>
+<div class="divider"></div>
 
-<div class="section-divider"></div>
-
-<!-- METHODE -->
-<section id="methode">
-    <div class="fade-in">
-        <div class="section-label">02 — Méthodologie</div>
-        <div class="section-title">Pipeline de <em>traitement</em></div>
-        <div class="section-desc">De la donnée brute au classement des pages : les étapes de construction de la matrice de transition et du calcul itératif du PageRank.</div>
+<!-- ═══ METHODE ═══ -->
+<section id="methode" data-spy="methode">
+    <div class="rv"><div class="s-num">02 — Méthodologie</div><div class="s-title">Pipeline de <em>traitement</em></div><div class="s-desc">De la donnée brute au classement : construction de la matrice de transition et calcul itératif.</div></div>
+    <div class="pipe-track rv d1">
+        <div class="pipe-step"><div class="pipe-dot">📥</div><div class="pipe-lbl">Chargement</div><div class="pipe-sub">lecture TSV</div></div>
+        <div class="pipe-step"><div class="pipe-dot">🏷️</div><div class="pipe-lbl">Indexation</div><div class="pipe-sub">4 169 nœuds</div></div>
+        <div class="pipe-step"><div class="pipe-dot">📐</div><div class="pipe-lbl">Adjacence</div><div class="pipe-sub">matrice n×n</div></div>
+        <div class="pipe-step"><div class="pipe-dot">🔄</div><div class="pipe-lbl">Transition</div><div class="pipe-sub">normalisation</div></div>
+        <div class="pipe-step"><div class="pipe-dot">⚡</div><div class="pipe-lbl">PageRank</div><div class="pipe-sub">puissance itérée</div></div>
     </div>
-
-    <div class="pipeline fade-in">
-        <div class="pipeline-step">
-            <div class="step-circle">📥</div>
-            <div class="step-title">Chargement</div>
-            <div class="step-desc">Lecture du TSV</div>
-        </div>
-        <div class="pipeline-arrow">→</div>
-        <div class="pipeline-step">
-            <div class="step-circle">🏷️</div>
-            <div class="step-title">Indexation</div>
-            <div class="step-desc">4 169 nœuds</div>
-        </div>
-        <div class="pipeline-arrow">→</div>
-        <div class="pipeline-step">
-            <div class="step-circle">📐</div>
-            <div class="step-title">Adjacence</div>
-            <div class="step-desc">Matrice n×n</div>
-        </div>
-        <div class="pipeline-arrow">→</div>
-        <div class="pipeline-step">
-            <div class="step-circle">🔄</div>
-            <div class="step-title">Transition</div>
-            <div class="step-desc">Normalisation</div>
-        </div>
-        <div class="pipeline-arrow">→</div>
-        <div class="pipeline-step">
-            <div class="step-circle">⚡</div>
-            <div class="step-title">PageRank</div>
-            <div class="step-desc">Puissance itérée</div>
+    <div class="rv d2">
+        <div class="graph-container">
+            <canvas id="interactiveGraph"></canvas>
+            <div class="graph-controls">
+                <button class="graph-ctrl active" onclick="toggleGravity(this)">Gravité</button>
+                <button class="graph-ctrl" onclick="toggleLabels(this)">Labels</button>
+                <button class="graph-ctrl" onclick="resetGraph()">Reset</button>
+            </div>
+            <div class="graph-legend"><strong>Interactif</strong> — Survolez pour les scores · <span class="tl">Cliquez</span> pour épingler · La souris repousse les nœuds</div>
         </div>
     </div>
-
-    <div class="formula-box fade-in">
-        <div class="formula-label">Formule — PageRank Standard</div>
-        <div class="formula-text">PR = (1 − β) / n + β × M × PR</div>
+    <div class="formula-row rv d3">
+        <div class="formula-cell"><div class="formula-lbl">PageRank Standard</div><div class="formula-expr">PR = (1 − β) / n + β · M · PR</div></div>
+        <div class="formula-cell"><div class="formula-lbl">PageRank Personnalisé</div><div class="formula-expr">PR = (1 − β) · V + β · M · PR</div></div>
     </div>
-
-    <div class="formula-box fade-in">
-        <div class="formula-label">Formule — PageRank Personnalisé</div>
-        <div class="formula-text">PR = (1 − β) × V + β × M × PR</div>
-    </div>
-
-    <div class="tech-row fade-in" style="margin-top:2rem;">
-        <div class="tech-chip"><div class="tech-dot" style="background:var(--gold)"></div> Python</div>
-        <div class="tech-chip"><div class="tech-dot" style="background:var(--accent-light)"></div> NumPy</div>
-        <div class="tech-chip"><div class="tech-dot" style="background:var(--green)"></div> Matplotlib</div>
-        <div class="tech-chip"><div class="tech-dot" style="background:var(--orange)"></div> urllib.parse</div>
-        <div class="tech-chip"><div class="tech-dot" style="background:var(--rose)"></div> time / os</div>
+    <div class="chips rv d4">
+        <div class="chip"><div class="chip-dot" style="background:var(--accent)"></div> Python</div>
+        <div class="chip"><div class="chip-dot" style="background:var(--lav)"></div> NumPy</div>
+        <div class="chip"><div class="chip-dot" style="background:var(--teal)"></div> Matplotlib</div>
+        <div class="chip"><div class="chip-dot" style="background:var(--coral)"></div> urllib.parse</div>
+        <div class="chip"><div class="chip-dot" style="background:var(--faint)"></div> time / os</div>
     </div>
 </section>
+<div class="divider"></div>
 
-<div class="section-divider"></div>
-
-<!-- RESULTATS -->
-<section id="resultats">
-    <div class="fade-in">
-        <div class="section-label">03 — Résultats</div>
-        <div class="section-title">PageRank <em>Standard</em></div>
-        <div class="section-desc">Classement des 20 pages les plus influentes du graphe Wikispeedia avec β = 0.85, convergence atteinte en 26 itérations.</div>
-    </div>
-
-    <div class="results-container fade-in">
-        <div class="result-panel">
-            <div class="panel-header">
-                <h3>Top 10 — Rang 1 à 10</h3>
-                <span class="badge">β = 0.85</span>
-            </div>
-            <table class="ranking-table">
-                <thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead>
-                <tbody>
-                    <tr><td class="rank">1</td><td class="page-name">United_States</td><td class="score">0.030514 <span class="score-bar" style="width:100px"></span></td></tr>
-                    <tr><td class="rank">2</td><td class="page-name">Europe</td><td class="score">0.014162 <span class="score-bar" style="width:46px"></span></td></tr>
-                    <tr><td class="rank">3</td><td class="page-name">United_Kingdom</td><td class="score">0.013187 <span class="score-bar" style="width:43px"></span></td></tr>
-                    <tr><td class="rank">4</td><td class="page-name">England</td><td class="score">0.011728 <span class="score-bar" style="width:38px"></span></td></tr>
-                    <tr><td class="rank">5</td><td class="page-name">Africa</td><td class="score">0.009416 <span class="score-bar" style="width:31px"></span></td></tr>
-                    <tr><td class="rank">6</td><td class="page-name">Earth</td><td class="score">0.008112 <span class="score-bar" style="width:26px"></span></td></tr>
-                    <tr><td class="rank">7</td><td class="page-name">World_War_II</td><td class="score">0.007853 <span class="score-bar" style="width:25px"></span></td></tr>
-                    <tr><td class="rank">8</td><td class="page-name">Germany</td><td class="score">0.005864 <span class="score-bar" style="width:19px"></span></td></tr>
-                    <tr><td class="rank">9</td><td class="page-name">North_America</td><td class="score">0.005672 <span class="score-bar" style="width:18px"></span></td></tr>
-                    <tr><td class="rank">10</td><td class="page-name">France</td><td class="score">0.005439 <span class="score-bar" style="width:17px"></span></td></tr>
-                </tbody>
-            </table>
+<!-- ═══ RESULTATS ═══ -->
+<section id="resultats" data-spy="resultats">
+    <div class="rv"><div class="s-num">03 — Résultats</div><div class="s-title">PageRank <em>Standard</em></div><div class="s-desc">Top 20 des pages les plus influentes du graphe avec β = 0.85, convergence en 26 itérations.</div></div>
+    <div class="r-grid rv d1">
+        <div class="r-panel"><div class="r-head"><h3>Rang 1 — 10</h3><span class="r-badge">β = 0.85</span></div>
+            <table class="rt"><thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead><tbody id="top10Body">
+                <tr><td class="rk">1</td><td class="pg">United_States</td><td class="sc">0.030514 <span class="score-bar" data-w="90"></span></td></tr>
+                <tr><td class="rk">2</td><td class="pg">Europe</td><td class="sc">0.014162 <span class="score-bar" data-w="42"></span></td></tr>
+                <tr><td class="rk">3</td><td class="pg">United_Kingdom</td><td class="sc">0.013187 <span class="score-bar" data-w="39"></span></td></tr>
+                <tr><td class="rk">4</td><td class="pg">England</td><td class="sc">0.011728 <span class="score-bar" data-w="34"></span></td></tr>
+                <tr><td class="rk">5</td><td class="pg">Africa</td><td class="sc">0.009416 <span class="score-bar" data-w="28"></span></td></tr>
+                <tr><td class="rk">6</td><td class="pg">Earth</td><td class="sc">0.008112 <span class="score-bar" data-w="24"></span></td></tr>
+                <tr><td class="rk">7</td><td class="pg">World_War_II</td><td class="sc">0.007853 <span class="score-bar" data-w="23"></span></td></tr>
+                <tr><td class="rk">8</td><td class="pg">Germany</td><td class="sc">0.005864 <span class="score-bar" data-w="17"></span></td></tr>
+                <tr><td class="rk">9</td><td class="pg">North_America</td><td class="sc">0.005672 <span class="score-bar" data-w="16"></span></td></tr>
+                <tr><td class="rk">10</td><td class="pg">France</td><td class="sc">0.005439 <span class="score-bar" data-w="16"></span></td></tr>
+            </tbody></table>
         </div>
+        <div class="r-panel"><div class="r-head"><h3>Rang 11 — 20</h3><span class="r-badge">β = 0.85</span></div>
+            <table class="rt"><thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead><tbody>
+                <tr><td class="rk">11</td><td class="pg">English_language</td><td class="sc">0.004521</td></tr>
+                <tr><td class="rk">12</td><td class="pg">Mammal</td><td class="sc">0.004297</td></tr>
+                <tr><td class="rk">13</td><td class="pg">Atlantic_Ocean</td><td class="sc">0.004270</td></tr>
+                <tr><td class="rk">14</td><td class="pg">Animal</td><td class="sc">0.004214</td></tr>
+                <tr><td class="rk">15</td><td class="pg">Human</td><td class="sc">0.004135</td></tr>
+                <tr><td class="rk">16</td><td class="pg">Periodic_table</td><td class="sc">0.004096</td></tr>
+                <tr><td class="rk">17</td><td class="pg">Computer</td><td class="sc">0.003883</td></tr>
+                <tr><td class="rk">18</td><td class="pg">Science</td><td class="sc">0.003780</td></tr>
+                <tr><td class="rk">19</td><td class="pg">London</td><td class="sc">0.003718</td></tr>
+                <tr><td class="rk">20</td><td class="pg">India</td><td class="sc">0.003687</td></tr>
+            </tbody></table>
+        </div>
+    </div>
+    <div class="callout rv d2"><div class="callout-t">💡 Résultat remarquable</div><p><strong>United_States</strong> obtient un score de 0.0305, soit plus du double de la 2ᵉ page (Europe, 0.0141). Ce « super-hub » révèle une structure de navigation très asymétrique.</p></div>
 
-        <div class="result-panel">
-            <div class="panel-header">
-                <h3>Top 20 — Rang 11 à 20</h3>
-                <span class="badge">β = 0.85</span>
-            </div>
-            <table class="ranking-table">
-                <thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead>
-                <tbody>
-                    <tr><td class="rank">11</td><td class="page-name">English_language</td><td class="score">0.004521</td></tr>
-                    <tr><td class="rank">12</td><td class="page-name">Mammal</td><td class="score">0.004297</td></tr>
-                    <tr><td class="rank">13</td><td class="page-name">Atlantic_Ocean</td><td class="score">0.004270</td></tr>
-                    <tr><td class="rank">14</td><td class="page-name">Animal</td><td class="score">0.004214</td></tr>
-                    <tr><td class="rank">15</td><td class="page-name">Human</td><td class="score">0.004135</td></tr>
-                    <tr><td class="rank">16</td><td class="page-name">Periodic_table</td><td class="score">0.004096</td></tr>
-                    <tr><td class="rank">17</td><td class="page-name">Computer</td><td class="score">0.003883</td></tr>
-                    <tr><td class="rank">18</td><td class="page-name">Science</td><td class="score">0.003780</td></tr>
-                    <tr><td class="rank">19</td><td class="page-name">London</td><td class="score">0.003718</td></tr>
-                    <tr><td class="rank">20</td><td class="page-name">India</td><td class="score">0.003687</td></tr>
-                </tbody>
-            </table>
+    <div class="rv" style="margin-top:4rem;"><div class="s-num">Impact du paramètre β</div><div class="s-title" style="font-size:1.5rem;">Stabilité du <em>Top 5</em></div><p style="color:var(--dim);font-weight:300;font-size:0.85rem;margin-bottom:1.5rem;">Le Top 5 reste identique pour β de 0.10 à 0.90.</p></div>
+    <div class="beta-cols rv d1">
+        <div class="beta-box"><h4>Itérations selon β</h4><div class="bar-group" id="betaBars">
+            <div class="bar-row"><span class="bar-lbl">β=0.10</span><div class="bar-track"><div class="bar-fill" data-w="13%" style="background:var(--teal);">4</div></div></div>
+            <div class="bar-row"><span class="bar-lbl">β=0.30</span><div class="bar-track"><div class="bar-fill" data-w="23%" style="background:var(--teal);">7</div></div></div>
+            <div class="bar-row"><span class="bar-lbl">β=0.50</span><div class="bar-track"><div class="bar-fill" data-w="37%" style="background:var(--lav);">11</div></div></div>
+            <div class="bar-row"><span class="bar-lbl">β=0.70</span><div class="bar-track"><div class="bar-fill" data-w="60%" style="background:var(--accent);">18</div></div></div>
+            <div class="bar-row"><span class="bar-lbl">β=0.85</span><div class="bar-track"><div class="bar-fill" data-w="87%" style="background:var(--coral);">26</div></div></div>
+            <div class="bar-row"><span class="bar-lbl">β=0.90</span><div class="bar-track"><div class="bar-fill" data-w="100%" style="background:var(--coral);">30</div></div></div>
+        </div></div>
+        <div class="beta-box"><h4>Permutations dans le Top 5</h4>
+            <div class="perm-row"><span class="perm-b">β=0.10</span><div class="perm-m"><span class="gold">US</span><span>England</span><span>Europe</span><span>UK</span><span>Africa</span></div></div>
+            <div class="perm-row"><span class="perm-b">β=0.50</span><div class="perm-m"><span class="gold">US</span><span>Europe</span><span>England</span><span>UK</span><span>Africa</span></div></div>
+            <div class="perm-row"><span class="perm-b">β=0.85</span><div class="perm-m"><span class="gold">US</span><span>Europe</span><span>UK</span><span>England</span><span>Africa</span></div></div>
+            <p style="font-size:0.68rem;color:var(--faint);margin-top:1rem;">US (1ᵉʳ) et Africa (5ᵉ) restent stables.</p>
         </div>
     </div>
 
-    <div class="insight-highlight fade-in">
-        <div class="insight-title">💡 Résultat remarquable</div>
-        <p><strong>United_States</strong> obtient un score de 0.0305, soit plus du double de la 2ᵉ page (Europe, 0.0141). Ce « super-hub » domine massivement le réseau, révélant une structure de navigation très asymétrique orientée vers les entités occidentales.</p>
+    <!-- INTERACTIVE BETA SLIDER -->
+    <div class="beta-slider-wrap rv d2">
+        <h4>🎛️ Simulateur interactif — Testez β en temps réel</h4>
+        <div class="slider-row">
+            <span style="font-size:0.7rem;color:var(--faint);">0.10</span>
+            <input type="range" class="beta-slider" id="betaSlider" min="10" max="95" value="85" step="5">
+            <span style="font-size:0.7rem;color:var(--faint);">0.95</span>
+            <div class="beta-val-display" id="betaValDisplay">0.85</div>
+        </div>
+        <div class="beta-result" id="betaResult"></div>
+        <div class="beta-result-iter" id="betaIterDisplay">26 itérations estimées</div>
     </div>
 
-    <!-- Beta Impact -->
-    <div class="fade-in" style="margin-top:4rem;">
-        <div class="section-label">Impact du paramètre β</div>
-        <div class="section-title" style="font-size:1.6rem;">Stabilité du <em>Top 5</em></div>
-        <p style="color:var(--text-muted);font-weight:300;font-size:0.9rem;margin-bottom:2rem;">Le Top 5 reste identique pour β allant de 0.10 à 0.90. Seul l'ordre relatif des positions 2-4 varie.</p>
-    </div>
-
-    <div class="beta-grid fade-in">
-        <div class="beta-card">
-            <h4>Itérations selon β</h4>
-            <div class="beta-bars">
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.10</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:13%;background:var(--green);">4</div></div>
-                </div>
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.30</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:23%;background:var(--green);">7</div></div>
-                </div>
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.50</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:37%;background:var(--accent-light);">11</div></div>
-                </div>
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.70</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:60%;background:var(--orange);">18</div></div>
-                </div>
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.85</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:87%;background:var(--rose);">26</div></div>
-                </div>
-                <div class="beta-bar-row">
-                    <span class="beta-bar-label">β=0.90</span>
-                    <div class="beta-bar-track"><div class="beta-bar-fill" style="width:100%;background:var(--rose);">30</div></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="beta-card">
-            <h4>Permutations dans le Top 5</h4>
-            <div style="font-size:0.8rem;line-height:2.2;">
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                    <span style="font-family:'JetBrains Mono';color:var(--text-muted);font-size:0.72rem;width:45px;">β=0.10</span>
-                    <span style="color:var(--gold);">🥇 US</span>
-                    <span style="color:#c0c0c0;">🥈 England</span>
-                    <span style="color:#cd7f32;">🥉 Europe</span>
-                    <span>UK</span>
-                    <span>Africa</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                    <span style="font-family:'JetBrains Mono';color:var(--text-muted);font-size:0.72rem;width:45px;">β=0.50</span>
-                    <span style="color:var(--gold);">🥇 US</span>
-                    <span style="color:#c0c0c0;">🥈 Europe</span>
-                    <span style="color:#cd7f32;">🥉 England</span>
-                    <span>UK</span>
-                    <span>Africa</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                    <span style="font-family:'JetBrains Mono';color:var(--text-muted);font-size:0.72rem;width:45px;">β=0.85</span>
-                    <span style="color:var(--gold);">🥇 US</span>
-                    <span style="color:#c0c0c0;">🥈 Europe</span>
-                    <span style="color:#cd7f32;">🥉 UK</span>
-                    <span>England</span>
-                    <span>Africa</span>
-                </div>
-            </div>
-            <p style="font-size:0.75rem;color:var(--text-muted);margin-top:1rem;font-weight:300;">United_States (1ᵉʳ) et Africa (5ᵉ) restent stables quel que soit β. Les positions intermédiaires permutent.</p>
-        </div>
+    <!-- RADAR CHART -->
+    <div class="radar-wrap rv d3">
+        <canvas id="radarCanvas" width="400" height="400"></canvas>
     </div>
 </section>
+<div class="divider"></div>
 
-<div class="section-divider"></div>
-
-<!-- PERSONALISE -->
-<section id="personnalise">
-    <div class="fade-in">
-        <div class="section-label">04 — PageRank Personnalisé</div>
-        <div class="section-title">Orientation <em>thématique</em></div>
-        <div class="section-desc">En modifiant le vecteur de téléportation V pour favoriser certaines pages, le classement s'oriente vers des communautés de nœuds thématiquement cohérentes.</div>
-    </div>
-
-    <div class="fade-in">
-        <div class="theme-tabs">
-            <button class="theme-tab active" onclick="switchTheme('computer')">🖥️ Computer</button>
-            <button class="theme-tab" onclick="switchTheme('savane')">🦁 Savane</button>
+<!-- ═══ PERSONNALISE ═══ -->
+<section id="personnalise" data-spy="personnalise">
+    <div class="rv"><div class="s-num">04 — PageRank Personnalisé</div><div class="s-title">Orientation <em>thématique</em></div><div class="s-desc">En modifiant le vecteur de téléportation V, le classement s'oriente vers des communautés thématiques.</div></div>
+    <div class="rv d1">
+        <div class="tab-row" id="themeTabs"><button class="tab-btn active" data-tab="computer">🖥 Computer</button><button class="tab-btn" data-tab="savane">🦁 Savane</button></div>
+        <div id="panel-computer" class="tab-panel active">
+            <div class="r-grid"><div class="r-panel span"><div class="r-head"><h3>Top 20 — personnalisé « Computer »</h3><span class="r-badge">36 itérations</span></div>
+            <table class="rt"><thead><tr><th>#</th><th>Page</th><th>Score</th><th></th></tr></thead><tbody>
+                <tr><td class="rk">1</td><td class="pg">Computer</td><td class="sc">0.080694</td><td class="dt">⬆ +16</td></tr>
+                <tr><td class="rk">2</td><td class="pg">BASIC</td><td class="sc">0.025795</td><td></td></tr>
+                <tr><td class="rk">3</td><td class="pg">Chemical_synapse</td><td class="sc">0.024806</td><td></td></tr>
+                <tr><td class="rk">4</td><td class="pg">CPU_cache</td><td class="sc">0.021642</td><td></td></tr>
+                <tr><td class="rk">5</td><td class="pg">ASCII</td><td class="sc">0.017087</td><td></td></tr>
+                <tr><td class="rk">6</td><td class="pg">Tim_Berners-Lee</td><td class="sc">0.016050</td><td></td></tr>
+                <tr><td class="rk">7</td><td class="pg">Central_processing_unit</td><td class="sc">0.015755</td><td></td></tr>
+                <tr><td class="rk">8</td><td class="pg">Integrated_circuit</td><td class="sc">0.013874</td><td></td></tr>
+                <tr><td class="rk">9</td><td class="pg">Electronics</td><td class="sc">0.013186</td><td></td></tr>
+                <tr><td class="rk">10</td><td class="pg">Semiconductor</td><td class="sc">0.012866</td><td></td></tr>
+                <tr><td class="rk">11</td><td class="pg">Quantum_computer</td><td class="sc">0.011740</td><td></td></tr>
+                <tr><td class="rk">12</td><td class="pg">Charles_Babbage</td><td class="sc">0.011180</td><td></td></tr>
+                <tr><td class="rk">13</td><td class="pg">Programming_language</td><td class="sc">0.010897</td><td></td></tr>
+                <tr><td class="rk">14</td><td class="pg">Xanadu_House</td><td class="sc">0.009286</td><td></td></tr>
+                <tr><td class="rk">15</td><td class="pg">Algorithm</td><td class="sc">0.008968</td><td></td></tr>
+                <tr><td class="rk">16</td><td class="pg">Technology</td><td class="sc">0.008760</td><td></td></tr>
+                <tr><td class="rk">17</td><td class="pg">Pi</td><td class="sc">0.008011</td><td></td></tr>
+                <tr><td class="rk">18</td><td class="pg">Microsoft</td><td class="sc">0.007873</td><td></td></tr>
+                <tr><td class="rk">19</td><td class="pg">Engineering</td><td class="sc">0.007563</td><td></td></tr>
+                <tr><td class="rk">20</td><td class="pg">Video</td><td class="sc">0.007410</td><td></td></tr>
+            </tbody></table></div></div>
+            <div class="callout" style="margin-top:1.2rem;"><div class="callout-t">🔍 Observation</div><p>Classement entièrement réorienté : CPU, semiconducteurs, Tim Berners-Lee et Charles Babbage remplacent les entités géographiques.</p></div>
         </div>
-
-        <div id="theme-computer" class="theme-content active">
-            <div class="results-container">
-                <div class="result-panel full-width">
-                    <div class="panel-header">
-                        <h3>Top 20 — PageRank personnalisé sur « Computer »</h3>
-                        <span class="badge">36 itérations</span>
-                    </div>
-                    <table class="ranking-table">
-                        <thead><tr><th>#</th><th>Page</th><th>Score</th><th></th></tr></thead>
-                        <tbody>
-                            <tr><td class="rank">1</td><td class="page-name">Computer</td><td class="score">0.080694</td><td style="font-size:0.7rem;color:var(--green);">⬆ +16 rangs</td></tr>
-                            <tr><td class="rank">2</td><td class="page-name">BASIC</td><td class="score">0.025795</td><td></td></tr>
-                            <tr><td class="rank">3</td><td class="page-name">Chemical_synapse</td><td class="score">0.024806</td><td></td></tr>
-                            <tr><td class="rank">4</td><td class="page-name">CPU_cache</td><td class="score">0.021642</td><td></td></tr>
-                            <tr><td class="rank">5</td><td class="page-name">ASCII</td><td class="score">0.017087</td><td></td></tr>
-                            <tr><td class="rank">6</td><td class="page-name">Tim_Berners-Lee</td><td class="score">0.016050</td><td></td></tr>
-                            <tr><td class="rank">7</td><td class="page-name">Central_processing_unit</td><td class="score">0.015755</td><td></td></tr>
-                            <tr><td class="rank">8</td><td class="page-name">Integrated_circuit</td><td class="score">0.013874</td><td></td></tr>
-                            <tr><td class="rank">9</td><td class="page-name">Electronics</td><td class="score">0.013186</td><td></td></tr>
-                            <tr><td class="rank">10</td><td class="page-name">Semiconductor</td><td class="score">0.012866</td><td></td></tr>
-                            <tr><td class="rank">11</td><td class="page-name">Quantum_computer</td><td class="score">0.011740</td><td></td></tr>
-                            <tr><td class="rank">12</td><td class="page-name">Charles_Babbage</td><td class="score">0.011180</td><td></td></tr>
-                            <tr><td class="rank">13</td><td class="page-name">Programming_language</td><td class="score">0.010897</td><td></td></tr>
-                            <tr><td class="rank">14</td><td class="page-name">Xanadu_House</td><td class="score">0.009286</td><td></td></tr>
-                            <tr><td class="rank">15</td><td class="page-name">Algorithm</td><td class="score">0.008968</td><td></td></tr>
-                            <tr><td class="rank">16</td><td class="page-name">Technology</td><td class="score">0.008760</td><td></td></tr>
-                            <tr><td class="rank">17</td><td class="page-name">Pi</td><td class="score">0.008011</td><td></td></tr>
-                            <tr><td class="rank">18</td><td class="page-name">Microsoft</td><td class="score">0.007873</td><td></td></tr>
-                            <tr><td class="rank">19</td><td class="page-name">Engineering</td><td class="score">0.007563</td><td></td></tr>
-                            <tr><td class="rank">20</td><td class="page-name">Video</td><td class="score">0.007410</td><td></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="insight-highlight" style="margin-top:1.5rem;">
-                <div class="insight-title">🔍 Observation</div>
-                <p>Le classement est entièrement réorienté vers l'informatique : CPU, semiconducteurs, langages de programmation, Tim Berners-Lee et Charles Babbage remplacent les entités géographiques qui dominaient le PageRank standard.</p>
-            </div>
-        </div>
-
-        <div id="theme-savane" class="theme-content">
-            <div class="results-container">
-                <div class="result-panel full-width">
-                    <div class="panel-header">
-                        <h3>Top 20 — PageRank personnalisé sur « Lion » & « Zebra »</h3>
-                        <span class="badge">38 itérations</span>
-                    </div>
-                    <table class="ranking-table">
-                        <thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead>
-                        <tbody>
-                            <tr><td class="rank">1</td><td class="page-name">Lion</td><td class="score">0.068844</td></tr>
-                            <tr><td class="rank">2</td><td class="page-name">Zebra</td><td class="score">0.055737</td></tr>
-                            <tr><td class="rank">3</td><td class="page-name">Okapi</td><td class="score">0.019446</td></tr>
-                            <tr><td class="rank">4</td><td class="page-name">Gazelle</td><td class="score">0.018511</td></tr>
-                            <tr><td class="rank">5</td><td class="page-name">Kenya</td><td class="score">0.012031</td></tr>
-                            <tr><td class="rank">6</td><td class="page-name">Wildebeest</td><td class="score">0.011891</td></tr>
-                            <tr><td class="rank">7</td><td class="page-name">Phoenix_Zoo</td><td class="score">0.011391</td></tr>
-                            <tr><td class="rank">8</td><td class="page-name">Mammal</td><td class="score">0.011007</td></tr>
-                            <tr><td class="rank">9</td><td class="page-name">Giraffe</td><td class="score">0.009818</td></tr>
-                            <tr><td class="rank">10</td><td class="page-name">Blue_Wildebeest</td><td class="score">0.009144</td></tr>
-                            <tr><td class="rank">11</td><td class="page-name">Grevy's_Zebra</td><td class="score">0.008921</td></tr>
-                            <tr><td class="rank">12</td><td class="page-name">Hyena</td><td class="score">0.008488</td></tr>
-                            <tr><td class="rank">13</td><td class="page-name">Heraldry</td><td class="score">0.008193</td></tr>
-                            <tr><td class="rank">14</td><td class="page-name">Dresden</td><td class="score">0.007630</td></tr>
-                            <tr><td class="rank">15</td><td class="page-name">Cape_Lion</td><td class="score">0.007426</td></tr>
-                            <tr><td class="rank">16</td><td class="page-name">Cheetah</td><td class="score">0.007113</td></tr>
-                            <tr><td class="rank">17</td><td class="page-name">Terik</td><td class="score">0.006618</td></tr>
-                            <tr><td class="rank">18</td><td class="page-name">Horse</td><td class="score">0.006414</td></tr>
-                            <tr><td class="rank">19</td><td class="page-name">Earwax</td><td class="score">0.006054</td></tr>
-                            <tr><td class="rank">20</td><td class="page-name">Black_Rhinoceros</td><td class="score">0.005543</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="insight-highlight" style="margin-top:1.5rem;">
-                <div class="insight-title">🔍 Observation</div>
-                <p>La personnalisation fait émerger un écosystème cohérent autour de la savane : gazelles, gnous, girafes, hyènes et guépards dominent le classement. Le Kenya apparaît comme ancrage géographique naturel de cette thématique.</p>
-            </div>
+        <div id="panel-savane" class="tab-panel">
+            <div class="r-grid"><div class="r-panel span"><div class="r-head"><h3>Top 20 — personnalisé « Lion » & « Zebra »</h3><span class="r-badge">38 itérations</span></div>
+            <table class="rt"><thead><tr><th>#</th><th>Page</th><th>Score</th></tr></thead><tbody>
+                <tr><td class="rk">1</td><td class="pg">Lion</td><td class="sc">0.068844</td></tr><tr><td class="rk">2</td><td class="pg">Zebra</td><td class="sc">0.055737</td></tr><tr><td class="rk">3</td><td class="pg">Okapi</td><td class="sc">0.019446</td></tr><tr><td class="rk">4</td><td class="pg">Gazelle</td><td class="sc">0.018511</td></tr><tr><td class="rk">5</td><td class="pg">Kenya</td><td class="sc">0.012031</td></tr><tr><td class="rk">6</td><td class="pg">Wildebeest</td><td class="sc">0.011891</td></tr><tr><td class="rk">7</td><td class="pg">Phoenix_Zoo</td><td class="sc">0.011391</td></tr><tr><td class="rk">8</td><td class="pg">Mammal</td><td class="sc">0.011007</td></tr><tr><td class="rk">9</td><td class="pg">Giraffe</td><td class="sc">0.009818</td></tr><tr><td class="rk">10</td><td class="pg">Blue_Wildebeest</td><td class="sc">0.009144</td></tr>
+                <tr><td class="rk">11</td><td class="pg">Grevy's_Zebra</td><td class="sc">0.008921</td></tr><tr><td class="rk">12</td><td class="pg">Hyena</td><td class="sc">0.008488</td></tr><tr><td class="rk">13</td><td class="pg">Heraldry</td><td class="sc">0.008193</td></tr><tr><td class="rk">14</td><td class="pg">Dresden</td><td class="sc">0.007630</td></tr><tr><td class="rk">15</td><td class="pg">Cape_Lion</td><td class="sc">0.007426</td></tr><tr><td class="rk">16</td><td class="pg">Cheetah</td><td class="sc">0.007113</td></tr><tr><td class="rk">17</td><td class="pg">Terik</td><td class="sc">0.006618</td></tr><tr><td class="rk">18</td><td class="pg">Horse</td><td class="sc">0.006414</td></tr><tr><td class="rk">19</td><td class="pg">Earwax</td><td class="sc">0.006054</td></tr><tr><td class="rk">20</td><td class="pg">Black_Rhinoceros</td><td class="sc">0.005543</td></tr>
+            </tbody></table></div></div>
+            <div class="callout" style="margin-top:1.2rem;"><div class="callout-t">🔍 Observation</div><p>Écosystème cohérent : gazelles, gnous, girafes, hyènes et guépards. Le Kenya comme ancrage géographique.</p></div>
         </div>
     </div>
-
-    <!-- Performance Comparison -->
-    <div class="fade-in" style="margin-top:4rem;">
-        <div class="section-label">Comparaison des performances</div>
-        <div class="section-title" style="font-size:1.6rem;">Standard vs <em>Personnalisé</em></div>
+    <div class="rv" style="margin-top:4rem;"><div class="s-num">Comparaison</div><div class="s-title" style="font-size:1.5rem;">Standard vs <em>Personnalisé</em></div></div>
+    <div class="perf-row rv d1">
+        <div class="perf-cell"><div class="p-lbl">Standard (β=0.85)</div><div class="p-val p-a">26</div><div class="p-sub">itérations — 2.55s</div></div>
+        <div class="perf-cell"><div class="p-lbl">Personnalisé « Computer »</div><div class="p-val p-t">36</div><div class="p-sub">itérations — 3.17s</div></div>
+        <div class="perf-cell"><div class="p-lbl">Personnalisé « Savane »</div><div class="p-val p-c">38</div><div class="p-sub">itérations — 3.37s</div></div>
     </div>
+    <div class="callout rv d2" style="margin-top:1.2rem;"><div class="callout-t">📊 Analyse</div><p>Le standard converge plus vite. Plus les pages favorisées sont éloignées du classement initial, plus la convergence ralentit.</p></div>
+</section>
+<div class="divider"></div>
 
-    <div class="perf-grid fade-in">
-        <div class="perf-card std">
-            <div class="perf-label">Standard (β=0.85)</div>
-            <div class="perf-value">26</div>
-            <div class="perf-unit">itérations — 2.55s</div>
-        </div>
-        <div class="perf-card comp">
-            <div class="perf-label">Personnalisé « Computer »</div>
-            <div class="perf-value">36</div>
-            <div class="perf-unit">itérations — 3.17s</div>
-        </div>
-        <div class="perf-card sav">
-            <div class="perf-label">Personnalisé « Savane »</div>
-            <div class="perf-value">38</div>
-            <div class="perf-unit">itérations — 3.37s</div>
-        </div>
-    </div>
-
-    <div class="insight-highlight fade-in" style="margin-top:1.5rem;">
-        <div class="insight-title">📊 Analyse</div>
-        <p>Le PageRank standard converge plus vite. Plus les pages favorisées sont éloignées du classement initial, plus la convergence ralentit — la redistribution des probabilités nécessite davantage d'itérations pour se stabiliser.</p>
+<!-- ═══ CODE ═══ -->
+<section id="code" data-spy="code">
+    <div class="rv"><div class="s-num">05 — Code source</div><div class="s-title">Implémentation <em>Python</em></div><div class="s-desc">Deux fichiers : PageRank standard et variante personnalisée.</div></div>
+    <div class="rv d1">
+        <div class="tab-row" id="codeTabs"><button class="tab-btn active" data-tab="std">pagerank_standard.py</button><button class="tab-btn" data-tab="perso">pagerank_personnalise.py</button></div>
+        <div id="panel-std" class="tab-panel active"><div class="code-wrap"><div class="code-top"><span class="code-fn"><span class="code-dt" style="background:var(--accent)"></span> pagerank_standard.py</span><div class="code-actions"><button class="lines-btn" onclick="toggleLines(this)">lignes</button><button class="copy-btn" onclick="doCopy('src-std')">copier</button></div></div><div class="code-scroll"><pre id="src-std"><span class="code-line"><span class="cm"># Partie 1 : PageRank Standard</span></span>
+<span class="code-line"><span class="kw">import</span> numpy <span class="kw">as</span> np</span>
+<span class="code-line"><span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt</span>
+<span class="code-line"><span class="kw">import</span> time, os</span>
+<span class="code-line"><span class="kw">from</span> urllib.parse <span class="kw">import</span> unquote</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">load_paths</span>(file_path):</span>
+<span class="code-line">    <span class="kw">if not</span> os.path.exists(file_path):</span>
+<span class="code-line">        <span class="fn">print</span>(<span class="str">f"ERREUR : Fichier introuvable : {file_path}"</span>)</span>
+<span class="code-line">        <span class="kw">return</span> []</span>
+<span class="code-line">    <span class="kw">with</span> <span class="fn">open</span>(file_path, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:</span>
+<span class="code-line">        lines = f.readlines()</span>
+<span class="code-line">    start_index = <span class="num">0</span></span>
+<span class="code-line">    <span class="kw">for</span> i, line <span class="kw">in</span> <span class="fn">enumerate</span>(lines):</span>
+<span class="code-line">        <span class="kw">if not</span> line.startswith(<span class="str">"#"</span>):</span>
+<span class="code-line">            start_index = i; <span class="kw">break</span></span>
+<span class="code-line">    paths = []</span>
+<span class="code-line">    <span class="kw">for</span> line <span class="kw">in</span> lines[start_index:]:</span>
+<span class="code-line">        parts = line.strip().split(<span class="str">"\t"</span>)</span>
+<span class="code-line">        <span class="kw">if</span> <span class="fn">len</span>(parts) > <span class="num">3</span>:</span>
+<span class="code-line">            path_cleaned = [<span class="fn">unquote</span>(n) <span class="kw">for</span> n <span class="kw">in</span> parts[<span class="num">3</span>].split(<span class="str">";"</span>)]</span>
+<span class="code-line">            paths.append(path_cleaned)</span>
+<span class="code-line">    <span class="fn">print</span>(<span class="str">f"Succès : {len(paths)} chemins chargés."</span>)</span>
+<span class="code-line">    <span class="kw">return</span> paths</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">create_node_index</span>(paths):</span>
+<span class="code-line">    nodes = {}; index = <span class="num">0</span></span>
+<span class="code-line">    <span class="kw">for</span> path <span class="kw">in</span> paths:</span>
+<span class="code-line">        <span class="kw">for</span> node <span class="kw">in</span> path:</span>
+<span class="code-line">            <span class="kw">if</span> node != <span class="str">"&lt;"</span> <span class="kw">and</span> node <span class="kw">not in</span> nodes:</span>
+<span class="code-line">                nodes[node] = index; index += <span class="num">1</span></span>
+<span class="code-line">    <span class="kw">return</span> nodes</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">matrice_transition</span>(paths, nodes):</span>
+<span class="code-line">    n = <span class="fn">len</span>(nodes)</span>
+<span class="code-line">    matrice_adjacence = np.zeros((n, n), dtype=np.float32)</span>
+<span class="code-line">    <span class="kw">for</span> path <span class="kw">in</span> paths:</span>
+<span class="code-line">        visited = []</span>
+<span class="code-line">        <span class="kw">for</span> node <span class="kw">in</span> path:</span>
+<span class="code-line">            <span class="kw">if</span> node == <span class="str">"&lt;"</span>:</span>
+<span class="code-line">                <span class="kw">if</span> <span class="fn">len</span>(visited) >= <span class="num">2</span>:</span>
+<span class="code-line">                    prev_i = nodes[visited[-<span class="num">1</span>]]</span>
+<span class="code-line">                    curr_i = nodes[visited[-<span class="num">2</span>]]</span>
+<span class="code-line">                    matrice_adjacence[prev_i, curr_i] += <span class="num">1</span></span>
+<span class="code-line">                    visited.pop()</span>
+<span class="code-line">                <span class="kw">elif</span> visited: visited.pop()</span>
+<span class="code-line">            <span class="kw">else</span>:</span>
+<span class="code-line">                <span class="kw">if</span> visited:</span>
+<span class="code-line">                    prev_i = nodes[visited[-<span class="num">1</span>]]</span>
+<span class="code-line">                    curr_i = nodes[node]</span>
+<span class="code-line">                    matrice_adjacence[prev_i, curr_i] += <span class="num">1</span></span>
+<span class="code-line">                visited.append(node)</span>
+<span class="code-line">    matrice_trans = matrice_adjacence.T</span>
+<span class="code-line">    <span class="kw">for</span> j <span class="kw">in</span> <span class="fn">range</span>(n):</span>
+<span class="code-line">        col_sum = np.sum(matrice_trans[:, j])</span>
+<span class="code-line">        <span class="kw">if</span> col_sum > <span class="num">0</span>:</span>
+<span class="code-line">            matrice_trans[:, j] /= col_sum</span>
+<span class="code-line">        <span class="kw">else</span>:</span>
+<span class="code-line">            matrice_trans[:, j] = <span class="num">1.0</span> / n</span>
+<span class="code-line">    <span class="kw">return</span> matrice_trans</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">pagerank</span>(matrix, beta, max_iterations=<span class="num">100</span>, epsilon=<span class="num">1e-6</span>):</span>
+<span class="code-line">    n = matrix.shape[<span class="num">0</span>]</span>
+<span class="code-line">    pagerank_vec = np.ones(n) / n</span>
+<span class="code-line">    iteration = <span class="num">0</span></span>
+<span class="code-line">    debut = time.time()</span>
+<span class="code-line">    teleport_vector = (<span class="num">1</span> - beta) / n</span>
+<span class="code-line">    <span class="kw">while</span> iteration &lt; max_iterations:</span>
+<span class="code-line">        prev = pagerank_vec.copy()</span>
+<span class="code-line">        <span class="cm"># PR = (1-β)/n + β × M × PR</span></span>
+<span class="code-line">        pagerank_vec = teleport_vector + beta * (matrix @ pagerank_vec)</span>
+<span class="code-line">        diff = np.linalg.norm(pagerank_vec - prev, ord=<span class="num">1</span>)</span>
+<span class="code-line">        <span class="kw">if</span> diff &lt; epsilon: <span class="kw">break</span></span>
+<span class="code-line">        iteration += <span class="num">1</span></span>
+<span class="code-line">    temps_exec = time.time() - debut</span>
+<span class="code-line">    <span class="kw">return</span> pagerank_vec, iteration, temps_exec</span></pre></div></div></div>
+        <div id="panel-perso" class="tab-panel"><div class="code-wrap"><div class="code-top"><span class="code-fn"><span class="code-dt" style="background:var(--teal)"></span> pagerank_personnalise.py</span><div class="code-actions"><button class="lines-btn" onclick="toggleLines(this)">lignes</button><button class="copy-btn" onclick="doCopy('src-perso')">copier</button></div></div><div class="code-scroll"><pre id="src-perso"><span class="code-line"><span class="cm"># Partie 2 : PageRank Personnalisé</span></span>
+<span class="code-line"><span class="kw">import</span> numpy <span class="kw">as</span> np</span>
+<span class="code-line"><span class="kw">import</span> time, os, sys</span>
+<span class="code-line"><span class="kw">from</span> pagerank_standard <span class="kw">import</span> load_paths, create_node_index, matrice_transition</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">pagerank_personnalise</span>(matrix, beta, personal_nodes, nodes,</span>
+<span class="code-line">                            max_iterations=<span class="num">100</span>, epsilon=<span class="num">1e-6</span>):</span>
+<span class="code-line">    n = matrix.shape[<span class="num">0</span>]</span>
+<span class="code-line">    pagerank = np.ones(n) / n</span>
+<span class="code-line">    personal_vector = np.zeros(n)</span>
+<span class="code-line">    found_nodes = <span class="num">0</span></span>
+<span class="code-line">    <span class="kw">for</span> node <span class="kw">in</span> personal_nodes:</span>
+<span class="code-line">        <span class="kw">if</span> node <span class="kw">in</span> nodes:</span>
+<span class="code-line">            personal_vector[nodes[node]] = <span class="num">1</span></span>
+<span class="code-line">            found_nodes += <span class="num">1</span></span>
+<span class="code-line">    <span class="kw">if</span> found_nodes == <span class="num">0</span>:</span>
+<span class="code-line">        personal_vector = np.ones(n) / n</span>
+<span class="code-line">    <span class="kw">else</span>:</span>
+<span class="code-line">        personal_vector /= np.sum(personal_vector)</span>
+<span class="code-line">    iteration = <span class="num">0</span>; debut = time.time(); diff = <span class="num">1</span></span>
+<span class="code-line">    M_hat = matrix.T</span>
+<span class="code-line">    <span class="kw">while</span> iteration &lt; max_iterations <span class="kw">and</span> diff >= epsilon:</span>
+<span class="code-line">        previous = pagerank.copy()</span>
+<span class="code-line">        <span class="cm"># PR = (1-β) × V + β × Mᵀ × PR</span></span>
+<span class="code-line">        pagerank = (<span class="num">1</span> - beta) * personal_vector + beta * (M_hat @ previous)</span>
+<span class="code-line">        s = np.sum(pagerank)</span>
+<span class="code-line">        <span class="kw">if</span> s > <span class="num">0</span>: pagerank /= s</span>
+<span class="code-line">        diff = np.linalg.norm(pagerank - previous, ord=<span class="num">1</span>)</span>
+<span class="code-line">        iteration += <span class="num">1</span></span>
+<span class="code-line">    temps_exec = time.time() - debut</span>
+<span class="code-line">    <span class="kw">return</span> pagerank, iteration, temps_exec</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="kw">def</span> <span class="fn">afficher_top_k</span>(pagerank_vector, nodes_dict, k=<span class="num">20</span>, titre=<span class="str">"Résultats"</span>):</span>
+<span class="code-line">    idx_to_node = {v: k <span class="kw">for</span> k, v <span class="kw">in</span> nodes_dict.items()}</span>
+<span class="code-line">    top_indices = np.argsort(pagerank_vector)[-k:][::-<span class="num">1</span>]</span>
+<span class="code-line">    <span class="fn">print</span>(<span class="str">f"\n=== Top {k} : {titre} ==="</span>)</span>
+<span class="code-line">    <span class="kw">for</span> i, idx <span class="kw">in</span> <span class="fn">enumerate</span>(top_indices):</span>
+<span class="code-line">        nom = idx_to_node.get(idx, <span class="str">"Inconnu"</span>)</span>
+<span class="code-line">        score = pagerank_vector[idx]</span>
+<span class="code-line">        <span class="fn">print</span>(<span class="str">f"{i+1:&lt;6} {nom:&lt;35} {score:.6f}"</span>)</span></pre></div></div></div>
     </div>
 </section>
+<div class="divider"></div>
 
-<div class="section-divider"></div>
-
-<!-- CODE -->
-<section id="code">
-    <div class="fade-in">
-        <div class="section-label">05 — Code source</div>
-        <div class="section-title">Implémentation <em>Python</em></div>
-        <div class="section-desc">L'intégralité du code est disponible ci-dessous. Deux fichiers principaux : le PageRank standard et sa variante personnalisée.</div>
+<!-- ═══ CONCLUSION ═══ -->
+<section id="conclusion" data-spy="conclusion">
+    <div class="rv"><div class="s-num">06 — Conclusion</div><div class="s-title">Bilan & <em>Perspectives</em></div></div>
+    <div class="conc-grid rv d1">
+        <div class="conc-card"><div class="cc-icon">✅</div><h3>Convergence efficace</h3><p>PageRank (β=0.85) converge en 26 itérations sur ce graphe réel.</p></div>
+        <div class="conc-card"><div class="cc-icon">🎯</div><h3>Personnalisation pertinente</h3><p>Réorientation efficace vers des communautés thématiques cohérentes.</p></div>
+        <div class="conc-card"><div class="cc-icon">📈</div><h3>Impact de β mesuré</h3><p>Le nœud dominant est stable, la hiérarchie secondaire varie.</p></div>
+        <div class="conc-card"><div class="cc-icon">🚀</div><h3>Perspectives</h3><p>Recommandation, réseaux sociaux, navigation personnalisée.</p></div>
     </div>
-
-    <div class="fade-in">
-        <div class="theme-tabs">
-            <button class="theme-tab active" onclick="switchCode('standard')" id="code-tab-standard">pagerank_standard.py</button>
-            <button class="theme-tab" onclick="switchCode('personnalise')" id="code-tab-personnalise">pagerank_personnalise.py</button>
+    <div class="authors-bar rv d2">
+        <div class="authors-left">
+            <div class="a-person"><div class="a-av">AN</div><div><div class="a-name">Amine Nakrou</div><div class="a-role">IS4 — Big Data</div></div></div>
+            <div class="a-person"><div class="a-av">RY</div><div><div class="a-name">Réda Yahi</div><div class="a-role">IS4 — Big Data</div></div></div>
         </div>
-
-        <div id="code-standard" class="theme-content active">
-            <div class="code-block">
-                <div class="code-header">
-                    <span class="file-name"><span class="file-dot" style="background:var(--gold)"></span> pagerank_standard.py</span>
-                    <button class="copy-btn" onclick="copyCode('standard')">Copier</button>
-                </div>
-                <div class="code-body">
-                    <pre><span class="cm"># Partie 1 : PageRank Standard</span>
-<span class="kw">import</span> numpy <span class="kw">as</span> np
-<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
-<span class="kw">import</span> time, os
-<span class="kw">from</span> urllib.parse <span class="kw">import</span> unquote
-
-<span class="kw">def</span> <span class="fn">load_paths</span>(file_path):
-    <span class="kw">if not</span> os.path.exists(file_path):
-        <span class="fn">print</span>(<span class="str">f"ERREUR : Fichier introuvable : {file_path}"</span>)
-        <span class="kw">return</span> []
-    <span class="kw">with</span> <span class="fn">open</span>(file_path, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
-        lines = f.readlines()
-    start_index = <span class="num">0</span>
-    <span class="kw">for</span> i, line <span class="kw">in</span> <span class="fn">enumerate</span>(lines):
-        <span class="kw">if not</span> line.startswith(<span class="str">"#"</span>):
-            start_index = i; <span class="kw">break</span>
-    paths = []
-    <span class="kw">for</span> line <span class="kw">in</span> lines[start_index:]:
-        parts = line.strip().split(<span class="str">"\t"</span>)
-        <span class="kw">if</span> <span class="fn">len</span>(parts) > <span class="num">3</span>:
-            path_cleaned = [<span class="fn">unquote</span>(n) <span class="kw">for</span> n <span class="kw">in</span> parts[<span class="num">3</span>].split(<span class="str">";"</span>)]
-            paths.append(path_cleaned)
-    <span class="fn">print</span>(<span class="str">f"Succès : {len(paths)} chemins chargés."</span>)
-    <span class="kw">return</span> paths
-
-<span class="kw">def</span> <span class="fn">create_node_index</span>(paths):
-    nodes = {}; index = <span class="num">0</span>
-    <span class="kw">for</span> path <span class="kw">in</span> paths:
-        <span class="kw">for</span> node <span class="kw">in</span> path:
-            <span class="kw">if</span> node != <span class="str">"&lt;"</span> <span class="kw">and</span> node <span class="kw">not in</span> nodes:
-                nodes[node] = index; index += <span class="num">1</span>
-    <span class="kw">return</span> nodes
-
-<span class="kw">def</span> <span class="fn">matrice_transition</span>(paths, nodes):
-    n = <span class="fn">len</span>(nodes)
-    matrice_adjacence = np.zeros((n, n), dtype=np.float32)
-    <span class="kw">for</span> path <span class="kw">in</span> paths:
-        visited = []
-        <span class="kw">for</span> node <span class="kw">in</span> path:
-            <span class="kw">if</span> node == <span class="str">"&lt;"</span>:
-                <span class="kw">if</span> <span class="fn">len</span>(visited) >= <span class="num">2</span>:
-                    prev_i = nodes[visited[-<span class="num">1</span>]]
-                    curr_i = nodes[visited[-<span class="num">2</span>]]
-                    matrice_adjacence[prev_i, curr_i] += <span class="num">1</span>
-                    visited.pop()
-                <span class="kw">elif</span> visited: visited.pop()
-            <span class="kw">else</span>:
-                <span class="kw">if</span> visited:
-                    prev_i = nodes[visited[-<span class="num">1</span>]]
-                    curr_i = nodes[node]
-                    matrice_adjacence[prev_i, curr_i] += <span class="num">1</span>
-                visited.append(node)
-    matrice_trans = matrice_adjacence.T
-    <span class="kw">for</span> j <span class="kw">in</span> <span class="fn">range</span>(n):
-        col_sum = np.sum(matrice_trans[:, j])
-        <span class="kw">if</span> col_sum > <span class="num">0</span>:
-            matrice_trans[:, j] /= col_sum
-        <span class="kw">else</span>:
-            matrice_trans[:, j] = <span class="num">1.0</span> / n
-    <span class="kw">return</span> matrice_trans
-
-<span class="kw">def</span> <span class="fn">pagerank</span>(matrix, beta, max_iterations=<span class="num">100</span>, epsilon=<span class="num">1e-6</span>):
-    n = matrix.shape[<span class="num">0</span>]
-    pagerank_vec = np.ones(n) / n
-    iteration = <span class="num">0</span>
-    debut = time.time()
-    teleport_vector = (<span class="num">1</span> - beta) / n
-    <span class="kw">while</span> iteration &lt; max_iterations:
-        prev = pagerank_vec.copy()
-        <span class="cm"># PR = (1-β)/n + β × M × PR</span>
-        pagerank_vec = teleport_vector + beta * (matrix @ pagerank_vec)
-        diff = np.linalg.norm(pagerank_vec - prev, ord=<span class="num">1</span>)
-        <span class="kw">if</span> diff &lt; epsilon: <span class="kw">break</span>
-        iteration += <span class="num">1</span>
-    temps_exec = time.time() - debut
-    <span class="kw">return</span> pagerank_vec, iteration, temps_exec</pre>
-                </div>
-            </div>
-        </div>
-
-        <div id="code-personnalise" class="theme-content">
-            <div class="code-block">
-                <div class="code-header">
-                    <span class="file-name"><span class="file-dot" style="background:var(--green)"></span> pagerank_personnalise.py</span>
-                    <button class="copy-btn" onclick="copyCode('personnalise')">Copier</button>
-                </div>
-                <div class="code-body">
-                    <pre><span class="cm"># Partie 2 : PageRank Personnalisé</span>
-<span class="kw">import</span> numpy <span class="kw">as</span> np
-<span class="kw">import</span> time, os, sys
-<span class="kw">from</span> pagerank_standard <span class="kw">import</span> load_paths, create_node_index, matrice_transition
-
-<span class="kw">def</span> <span class="fn">pagerank_personnalise</span>(matrix, beta, personal_nodes, nodes,
-                            max_iterations=<span class="num">100</span>, epsilon=<span class="num">1e-6</span>):
-    n = matrix.shape[<span class="num">0</span>]
-    pagerank = np.ones(n) / n
-    personal_vector = np.zeros(n)
-
-    <span class="cm"># Construction du vecteur de personnalisation</span>
-    found_nodes = <span class="num">0</span>
-    <span class="kw">for</span> node <span class="kw">in</span> personal_nodes:
-        <span class="kw">if</span> node <span class="kw">in</span> nodes:
-            personal_vector[nodes[node]] = <span class="num">1</span>
-            found_nodes += <span class="num">1</span>
-    <span class="kw">if</span> found_nodes == <span class="num">0</span>:
-        personal_vector = np.ones(n) / n
-    <span class="kw">else</span>:
-        personal_vector /= np.sum(personal_vector)
-
-    iteration = <span class="num">0</span>
-    debut = time.time()
-    diff = <span class="num">1</span>
-    M_hat = matrix.T
-
-    <span class="kw">while</span> iteration &lt; max_iterations <span class="kw">and</span> diff >= epsilon:
-        previous = pagerank.copy()
-        <span class="cm"># PR = (1-β) × V + β × Mᵀ × PR</span>
-        pagerank = (<span class="num">1</span> - beta) * personal_vector + beta * (M_hat @ previous)
-        s = np.sum(pagerank)
-        <span class="kw">if</span> s > <span class="num">0</span>: pagerank /= s
-        diff = np.linalg.norm(pagerank - previous, ord=<span class="num">1</span>)
-        iteration += <span class="num">1</span>
-
-    temps_exec = time.time() - debut
-    <span class="kw">return</span> pagerank, iteration, temps_exec
-
-<span class="kw">def</span> <span class="fn">afficher_top_k</span>(pagerank_vector, nodes_dict, k=<span class="num">20</span>, titre=<span class="str">"Résultats"</span>):
-    idx_to_node = {v: k <span class="kw">for</span> k, v <span class="kw">in</span> nodes_dict.items()}
-    top_indices = np.argsort(pagerank_vector)[-k:][::-<span class="num">1</span>]
-    <span class="fn">print</span>(<span class="str">f"\n=== Top {k} : {titre} ==="</span>)
-    <span class="kw">for</span> i, idx <span class="kw">in</span> <span class="fn">enumerate</span>(top_indices):
-        nom = idx_to_node.get(idx, <span class="str">"Inconnu"</span>)
-        score = pagerank_vector[idx]
-        <span class="fn">print</span>(<span class="str">f"{i+1:&lt;6} {nom:&lt;35} {score:.6f}"</span>)</pre>
-                </div>
-            </div>
-        </div>
+        <div class="authors-right">Encadrant : <strong>Serge Petiton</strong><br>Année 2025-2026</div>
     </div>
 </section>
-
-<div class="section-divider"></div>
-
-<!-- CONCLUSION -->
-<section id="conclusion">
-    <div class="fade-in">
-        <div class="section-label">06 — Conclusion</div>
-        <div class="section-title">Bilan & <em>Perspectives</em></div>
-    </div>
-
-    <div class="dataset-grid fade-in">
-        <div class="data-card">
-            <div class="card-icon green">✅</div>
-            <h3>Convergence efficace</h3>
-            <p>Le PageRank standard avec β=0.85 converge en 26 itérations, validant l'approche par puissance itérée sur ce graphe réel.</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon purple">🎯</div>
-            <h3>Personnalisation pertinente</h3>
-            <p>La variante personnalisée réoriente efficacement le classement vers des communautés thématiques cohérentes (informatique, faune africaine).</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon orange">📈</div>
-            <h3>Impact de β mesuré</h3>
-            <p>Le facteur d'amortissement n'affecte pas le nœud dominant mais modifie significativement la hiérarchie des nœuds secondaires.</p>
-        </div>
-        <div class="data-card">
-            <div class="card-icon rose">🚀</div>
-            <h3>Perspectives</h3>
-            <p>Applications potentielles en recommandation de contenu, analyse de réseaux sociaux et personnalisation de la navigation web.</p>
-        </div>
-    </div>
-
-    <div class="authors-section fade-in">
-        <div class="author-card">
-            <div class="author-avatar">AN</div>
-            <div class="author-info">
-                <div class="author-name">Amine Nakrou</div>
-                <div class="author-role">IS4 — Big Data</div>
-            </div>
-        </div>
-        <div class="author-card">
-            <div class="author-avatar">RY</div>
-            <div class="author-info">
-                <div class="author-name">Réda Yahi</div>
-                <div class="author-role">IS4 — Big Data</div>
-            </div>
-        </div>
-    </div>
-
-    <p style="text-align:center;margin-top:1.5rem;font-size:0.82rem;color:var(--text-muted);">
-        Encadrant : <strong style="color:var(--text);">Serge Petiton</strong> — Année universitaire 2025-2026
-    </p>
-</section>
-
-<!-- FOOTER -->
-<footer>
-    <p>PageRank × Wikispeedia — Projet Big Data IS4 · <a href="https://snap.stanford.edu/data/wikispeedia.html" target="_blank">Dataset Stanford</a></p>
-</footer>
+<footer><p>PageRank × Wikispeedia — Projet Big Data IS4 · <a href="https://snap.stanford.edu/data/wikispeedia.html" target="_blank">Dataset Stanford SNAP</a></p></footer>
 
 <script>
-    // Theme tab switching
-    function switchTheme(theme) {
-        document.querySelectorAll('.theme-content').forEach(c => c.classList.remove('active'));
-        document.querySelectorAll('.theme-tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('theme-' + theme).classList.add('active');
-        event.target.classList.add('active');
-    }
+// ═══════════════════════════════════════
+// 1. LOADING SCREEN
+// ═══════════════════════════════════════
+(function(){const logo=document.getElementById('loaderLogo'),pct=document.getElementById('loaderPct');const text='PageRank × Wikispeedia';text.split('').forEach((ch,i)=>{const s=document.createElement('span');s.textContent=ch===' '?' ':ch;s.style.animationDelay=i*0.04+'s';logo.appendChild(s);});let p=0;const iv=setInterval(()=>{p+=Math.random()*15;if(p>=100){p=100;clearInterval(iv);setTimeout(()=>{document.getElementById('loader').classList.add('done');document.body.style.overflow='';},400);}pct.textContent=Math.floor(p)+'%';},80);})();
 
-    // Code tab switching
-    function switchCode(tab) {
-        document.querySelectorAll('#code .theme-content').forEach(c => c.classList.remove('active'));
-        document.getElementById('code-tab-standard').classList.remove('active');
-        document.getElementById('code-tab-personnalise').classList.remove('active');
-        document.getElementById('code-' + tab).classList.add('active');
-        document.getElementById('code-tab-' + tab).classList.add('active');
-    }
+// ═══════════════════════════════════════
+// 2. CURSOR + TRAIL
+// ═══════════════════════════════════════
+const dot=document.getElementById('cursorDot'),ring=document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+const trail=[];for(let i=0;i<8;i++){const d=document.createElement('div');d.className='trail-dot';d.style.opacity=0;document.body.appendChild(d);trail.push({el:d,x:0,y:0});}
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx-4+'px';dot.style.top=my-4+'px';});
+document.addEventListener('mousedown',()=>dot.classList.add('click'));
+document.addEventListener('mouseup',()=>dot.classList.remove('click'));
+function ringLoop(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;ring.style.left=rx-18+'px';ring.style.top=ry-18+'px';
+let px=mx,py=my;for(const t of trail){t.x+=(px-t.x)*0.25;t.y+=(py-t.y)*0.25;t.el.style.left=t.x-2+'px';t.el.style.top=t.y-2+'px';t.el.style.opacity='0.15';px=t.x;py=t.y;}
+requestAnimationFrame(ringLoop);}ringLoop();
+document.querySelectorAll('a,button,.tilt-card,.pipe-step,.chip,.tab-btn,.counter-cell,.perf-cell,.conc-card,.callout,.perm-row,.mag-btn,.side-dot,.back-top,.graph-ctrl,.bar-track,.copy-btn,.lines-btn').forEach(el=>{el.addEventListener('mouseenter',()=>ring.classList.add('hover'));el.addEventListener('mouseleave',()=>ring.classList.remove('hover'));});
 
-    // Copy code
-    function copyCode(type) {
-        const codeBlock = document.querySelector('#code-' + type + ' pre');
-        navigator.clipboard.writeText(codeBlock.textContent).then(() => {
-            const btn = document.querySelector('#code-' + type + ' .copy-btn');
-            btn.textContent = 'Copié ✓';
-            setTimeout(() => btn.textContent = 'Copier', 2000);
-        });
-    }
+// ═══════════════════════════════════════
+// 3. SCROLL PROGRESS + NAV STATE + BACK TOP + SCROLL SPY
+// ═══════════════════════════════════════
+const prog=document.getElementById('scrollProgress'),backTop=document.getElementById('backTop'),mainNav=document.getElementById('mainNav');
+const sections=[...document.querySelectorAll('[data-spy]')];
+const navLinks=document.querySelectorAll('.nav-links a[data-section]');
+const sideDots=document.querySelectorAll('.side-dot[data-section]');
+window.addEventListener('scroll',()=>{
+    const h=document.documentElement.scrollHeight-window.innerHeight;
+    const pct=window.scrollY/h;
+    prog.style.width=(pct*100)+'%';
+    if(window.scrollY>300)backTop.classList.add('vis');else backTop.classList.remove('vis');
+    if(window.scrollY>60)mainNav.classList.add('scrolled');else mainNav.classList.remove('scrolled');
+    // scroll spy
+    let current='hero';
+    for(const s of sections){const r=s.getBoundingClientRect();if(r.top<=200)current=s.dataset.spy;}
+    navLinks.forEach(a=>{a.classList.toggle('active',a.dataset.section===current);});
+    sideDots.forEach(d=>{d.classList.toggle('active',d.dataset.section===current);});
+},{passive:true});
+function scrollTo2(sel){document.querySelector(sel)?.scrollIntoView({behavior:'smooth'});}
 
-    // Scroll animations
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-            }
-        });
-    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+// ═══════════════════════════════════════
+// 4. PARALLAX ORBS
+// ═══════════════════════════════════════
+window.addEventListener('scroll',()=>{const y=window.scrollY;const o1=document.getElementById('orb1'),o2=document.getElementById('orb2'),o3=document.getElementById('orb3');if(o1){o1.style.transform=`translate(0,${y*0.15}px)`;o2.style.transform=`translate(0,${y*-0.1}px)`;o3.style.transform=`translate(0,${y*0.08}px)`;}},{passive:true});
 
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+// ═══════════════════════════════════════
+// 5. HERO TEXT + GLITCH
+// ═══════════════════════════════════════
+(function(){const h1=document.getElementById('heroTitle');if(!h1)return;let idx=0;h1.innerHTML=h1.innerHTML.replace(/>([^<]+)</g,(m,text)=>{const chars=text.split('').map(ch=>{if(ch===' '||ch==='\n')return ch;const d=0.5+idx*0.018;idx++;return `<span class="char" style="animation-delay:${d}s">${ch}</span>`;}).join('');return'>'+chars+'<';});})();
+
+// ═══════════════════════════════════════
+// 6. COUNTERS
+// ═══════════════════════════════════════
+function animC(el){const t=parseFloat(el.dataset.target),dec=el.dataset.decimal==='true',sfx=el.dataset.suffix||'',dur=2000,st=performance.now();function tick(n){const p=Math.min((n-st)/dur,1),e=1-Math.pow(1-p,4),v=t*e;el.textContent=dec?v.toFixed(2)+sfx:Math.floor(v).toLocaleString('fr-FR')+sfx;if(p<1)requestAnimationFrame(tick);}requestAnimationFrame(tick);}
+const cObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.querySelectorAll('.counter-val').forEach(animC);cObs.unobserve(e.target);}});},{threshold:0.5});
+document.querySelectorAll('.hero-counters').forEach(el=>cObs.observe(el));
+
+// ═══════════════════════════════════════
+// 7. 3D TILT CARDS
+// ═══════════════════════════════════════
+document.querySelectorAll('[data-tilt]').forEach(c=>{
+    c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-0.5,y=(e.clientY-r.top)/r.height-0.5;c.style.transform=`perspective(800px) rotateY(${x*14}deg) rotateX(${-y*14}deg) scale(1.03)`;c.style.backgroundImage=`radial-gradient(circle at ${e.clientX-r.left}px ${e.clientY-r.top}px,rgba(240,160,80,0.04),transparent 60%)`;});
+    c.addEventListener('mouseleave',()=>{c.style.transform='';c.style.backgroundImage='';});
+});
+
+// ═══════════════════════════════════════
+// 8. PARTICLES
+// ═══════════════════════════════════════
+(function(){const c=document.getElementById('particles'),ctx=c.getContext('2d');let W,H;const ps=[];const cnt=55;
+function resize(){W=window.innerWidth;H=window.innerHeight;c.width=W;c.height=H;}resize();window.addEventListener('resize',resize);
+for(let i=0;i<cnt;i++)ps.push({x:Math.random()*W,y:Math.random()*H,r:0.5+Math.random()*1.5,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,a:0.08+Math.random()*0.15});
+function draw(){ctx.clearRect(0,0,W,H);for(const p of ps){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;const dx=p.x-mx,dy=p.y-my,d=Math.sqrt(dx*dx+dy*dy);if(d<150&&d>0){p.x+=dx/d*1.5;p.y+=dy/d*1.5;}ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(240,160,80,${p.a})`;ctx.fill();}
+for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){const dx=ps[i].x-ps[j].x,dy=ps[i].y-ps[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<120){ctx.beginPath();ctx.moveTo(ps[i].x,ps[i].y);ctx.lineTo(ps[j].x,ps[j].y);ctx.strokeStyle=`rgba(240,160,80,${0.05*(1-d/120)})`;ctx.lineWidth=0.5;ctx.stroke();}}
+requestAnimationFrame(draw);}draw();})();
+
+// ═══════════════════════════════════════
+// 9. FORCE GRAPH
+// ═══════════════════════════════════════
+let graphGravity=true,graphLabelsAll=false;
+function toggleGravity(btn){graphGravity=!graphGravity;btn.classList.toggle('active');}
+function toggleLabels(btn){graphLabelsAll=!graphLabelsAll;btn.classList.toggle('active');}
+function resetGraph(){graphNodes.forEach(n=>{n.pinned=false;n.vx=0;n.vy=0;});}
+let graphNodes=[];
+(function(){const canvas=document.getElementById('interactiveGraph');if(!canvas)return;const ctx=canvas.getContext('2d');let W,H;
+const labels=['United_States','Europe','UK','England','Africa','Earth','WW2','Germany','France','Computer','Mammal','Human','Science','India','London','Animal','Atlantic','Periodic_tbl','N.America','Eng_lang'];
+const scores=[0.031,0.014,0.013,0.012,0.009,0.008,0.008,0.006,0.005,0.004,0.004,0.004,0.004,0.004,0.004,0.004,0.004,0.004,0.006,0.005];
+const edges=[];let hovered=-1,gMX=0,gMY=0;
+function resize(){const r=canvas.parentElement.getBoundingClientRect();W=r.width;H=r.height;const dpr=window.devicePixelRatio||1;canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);}
+function init(){resize();graphNodes.length=0;edges.length=0;const cx=W/2,cy=H/2;
+for(let i=0;i<labels.length;i++){const a=(i/labels.length)*Math.PI*2+Math.random()*0.3,d=80+Math.random()*150;graphNodes.push({x:cx+Math.cos(a)*d,y:cy+Math.sin(a)*d,vx:0,vy:0,r:6+scores[i]*600,label:labels[i],score:scores[i],pinned:false});}
+for(let i=1;i<graphNodes.length;i++)edges.push([0,i]);
+for(let i=1;i<graphNodes.length;i++)for(let j=i+1;j<graphNodes.length;j++)if(Math.random()<0.12)edges.push([i,j]);}
+canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();gMX=e.clientX-r.left;gMY=e.clientY-r.top;hovered=-1;for(let i=0;i<graphNodes.length;i++){const dx=graphNodes[i].x-gMX,dy=graphNodes[i].y-gMY;if(Math.sqrt(dx*dx+dy*dy)<graphNodes[i].r+8){hovered=i;break;}}});
+canvas.addEventListener('click',()=>{if(hovered>=0)graphNodes[hovered].pinned=!graphNodes[hovered].pinned;});
+function sim(){const cx=W/2,cy=H/2;if(graphGravity)for(const n of graphNodes){if(n.pinned)continue;n.vx+=(cx-n.x)*0.0003;n.vy+=(cy-n.y)*0.0003;}
+for(let i=0;i<graphNodes.length;i++)for(let j=i+1;j<graphNodes.length;j++){const dx=graphNodes[i].x-graphNodes[j].x,dy=graphNodes[i].y-graphNodes[j].y,d=Math.max(Math.sqrt(dx*dx+dy*dy),1),f=800/(d*d);if(!graphNodes[i].pinned){graphNodes[i].vx+=dx/d*f;graphNodes[i].vy+=dy/d*f;}if(!graphNodes[j].pinned){graphNodes[j].vx-=dx/d*f;graphNodes[j].vy-=dy/d*f;}}
+for(const[a,b]of edges){const dx=graphNodes[b].x-graphNodes[a].x,dy=graphNodes[b].y-graphNodes[a].y,d=Math.sqrt(dx*dx+dy*dy),f=(d-100)*0.002;if(!graphNodes[a].pinned){graphNodes[a].vx+=dx/d*f;graphNodes[a].vy+=dy/d*f;}if(!graphNodes[b].pinned){graphNodes[b].vx-=dx/d*f;graphNodes[b].vy-=dy/d*f;}}
+for(const n of graphNodes){if(n.pinned)continue;const dx=n.x-gMX,dy=n.y-gMY,d=Math.sqrt(dx*dx+dy*dy);if(d<120&&d>0){n.vx+=dx/d*2;n.vy+=dy/d*2;}n.vx*=0.88;n.vy*=0.88;n.x+=n.vx;n.y+=n.vy;n.x=Math.max(n.r,Math.min(W-n.r,n.x));n.y=Math.max(n.r,Math.min(H-n.r,n.y));}}
+function draw(){ctx.clearRect(0,0,W,H);for(const[a,b]of edges){const h=a===hovered||b===hovered;ctx.beginPath();ctx.moveTo(graphNodes[a].x,graphNodes[a].y);ctx.lineTo(graphNodes[b].x,graphNodes[b].y);ctx.strokeStyle=h?'rgba(240,160,80,0.25)':'rgba(100,100,120,0.08)';ctx.lineWidth=h?1.5:0.8;ctx.stroke();}
+for(let i=0;i<graphNodes.length;i++){const n=graphNodes[i],isH=i===hovered,isHub=i===0;
+if(isHub||isH){ctx.beginPath();ctx.arc(n.x,n.y,n.r+12,0,Math.PI*2);const g=ctx.createRadialGradient(n.x,n.y,n.r,n.x,n.y,n.r+12);g.addColorStop(0,isHub?'rgba(240,160,80,0.2)':'rgba(78,201,176,0.2)');g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fill();}
+ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=isHub?(isH?'rgba(240,160,80,0.9)':'rgba(240,160,80,0.7)'):n.pinned?'rgba(78,201,176,0.8)':(isH?'rgba(200,198,192,0.6)':'rgba(140,138,132,0.3)');ctx.fill();
+if(isH||isHub||graphLabelsAll){ctx.font=`${isHub?600:500} ${isHub?12:10}px Outfit`;ctx.fillStyle=isH||isHub?'rgba(245,240,232,0.9)':'rgba(245,240,232,0.4)';ctx.textAlign='center';ctx.fillText(n.label,n.x,n.y-n.r-8);if(isH){ctx.font='400 10px "IBM Plex Mono"';ctx.fillStyle='rgba(240,160,80,0.8)';ctx.fillText('PR: '+n.score.toFixed(4),n.x,n.y-n.r-22);}}
+if(n.pinned){ctx.beginPath();ctx.arc(n.x,n.y,n.r+4,0,Math.PI*2);ctx.strokeStyle='rgba(78,201,176,0.5)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);}}
+sim();requestAnimationFrame(draw);}
+init();draw();let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(init,200);});})();
+
+// ═══════════════════════════════════════
+// 10. TABS
+// ═══════════════════════════════════════
+function setupTabs(id){const c=document.getElementById(id);if(!c)return;c.querySelectorAll('.tab-btn').forEach(btn=>{btn.addEventListener('click',()=>{c.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const sec=c.closest('section')||c.parentElement;sec.querySelectorAll(':scope > .rv > .tab-panel, :scope > .tab-panel, .tab-panel').forEach(p=>{if(p.closest('[id$="Tabs"]')===c||p.closest('.rv')?.querySelector('[id$="Tabs"]')===c||!p.closest('[id$="Tabs"]')){/* skip */}});const allPanels=sec.querySelectorAll('.tab-panel');allPanels.forEach(p=>p.classList.remove('active'));const t=sec.querySelector('#panel-'+btn.dataset.tab);if(t)t.classList.add('active');});});}
+setupTabs('themeTabs');setupTabs('codeTabs');
+
+// ═══════════════════════════════════════
+// 11. TOAST + COPY
+// ═══════════════════════════════════════
+function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function doCopy(id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.textContent).then(()=>showToast('Code copié dans le presse-papier !'));}
+function toggleLines(btn){const scroll=btn.closest('.code-wrap').querySelector('.code-scroll');scroll.classList.toggle('show-lines');btn.textContent=scroll.classList.contains('show-lines')?'masquer n°':'lignes';}
+
+// ═══════════════════════════════════════
+// 12. SCROLL REVEAL + BARS + SCORE BARS
+// ═══════════════════════════════════════
+const rvObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:0.06,rootMargin:'0px 0px -30px 0px'});
+document.querySelectorAll('.rv').forEach(el=>rvObs.observe(el));
+const bObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.querySelectorAll('.bar-fill').forEach(b=>{b.style.width=b.dataset.w;});bObs.unobserve(e.target);}});},{threshold:0.3});
+const bg=document.getElementById('betaBars');if(bg)bObs.observe(bg);
+const sObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.querySelectorAll('.score-bar').forEach(b=>{b.style.width=b.dataset.w+'px';});sObs.unobserve(e.target);}});},{threshold:0.2});
+document.querySelectorAll('.r-panel').forEach(p=>sObs.observe(p));
+
+// ═══════════════════════════════════════
+// 13. MAGNETIC BUTTONS
+// ═══════════════════════════════════════
+document.querySelectorAll('.mag-btn').forEach(btn=>{
+    btn.addEventListener('mousemove',e=>{const r=btn.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;btn.style.transform=`translate(${x*0.25}px,${y*0.25}px)`;});
+    btn.addEventListener('mouseleave',()=>{btn.style.transform='';});
+});
+
+// ═══════════════════════════════════════
+// 14. CLICK PARTICLES
+// ═══════════════════════════════════════
+document.addEventListener('click',e=>{for(let i=0;i<10;i++){const p=document.createElement('div');p.style.cssText=`position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:${3+Math.random()*3}px;height:${3+Math.random()*3}px;border-radius:50%;background:${['var(--accent)','var(--teal)','var(--lav)'][i%3]};pointer-events:none;z-index:99997;`;document.body.appendChild(p);const a=(i/10)*Math.PI*2,d=30+Math.random()*50,tx=Math.cos(a)*d,ty=Math.sin(a)*d;p.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:`translate(calc(-50% + ${tx}px),calc(-50% + ${ty}px)) scale(0)`,opacity:0}],{duration:500+Math.random()*300,easing:'cubic-bezier(0.16,1,0.3,1)'}).onfinish=()=>p.remove();}});
+
+// ═══════════════════════════════════════
+// 15. INTERACTIVE BETA SLIDER
+// ═══════════════════════════════════════
+const betaData={0.10:{top:['US','England','Europe','UK','Africa'],scores:[0.033,0.015,0.013,0.012,0.010],iter:4},0.30:{top:['US','England','Europe','UK','Africa'],scores:[0.032,0.014,0.014,0.013,0.010],iter:7},0.50:{top:['US','Europe','England','UK','Africa'],scores:[0.031,0.014,0.013,0.013,0.009],iter:11},0.70:{top:['US','Europe','UK','England','Africa'],scores:[0.031,0.014,0.013,0.012,0.009],iter:18},0.85:{top:['US','Europe','UK','England','Africa'],scores:[0.031,0.014,0.013,0.012,0.009],iter:26},0.90:{top:['US','Europe','UK','England','Africa'],scores:[0.030,0.014,0.013,0.012,0.009],iter:30},0.95:{top:['US','Europe','UK','England','Africa'],scores:[0.029,0.014,0.013,0.011,0.009],iter:38}};
+function updateBeta(val){const b=val/100;document.getElementById('betaValDisplay').textContent=b.toFixed(2);
+const closest=Object.keys(betaData).reduce((p,c)=>Math.abs(c-b)<Math.abs(p-b)?c:p);
+const d=betaData[closest];const res=document.getElementById('betaResult');res.innerHTML='';
+d.top.forEach((name,i)=>{const cell=document.createElement('div');cell.className='beta-result-cell'+(i===0?' top1':'');cell.innerHTML=`<div class="brc-rank">#${i+1}</div><div class="brc-name">${name}</div><div class="brc-score">${d.scores[i].toFixed(4)}</div>`;res.appendChild(cell);});
+document.getElementById('betaIterDisplay').textContent=d.iter+' itérations estimées';}
+const slider=document.getElementById('betaSlider');if(slider){slider.addEventListener('input',e=>updateBeta(e.target.value));updateBeta(85);}
+
+// ═══════════════════════════════════════
+// 16. RADAR CHART
+// ═══════════════════════════════════════
+(function(){const canvas=document.getElementById('radarCanvas');if(!canvas)return;const ctx=canvas.getContext('2d');const dpr=window.devicePixelRatio||1;canvas.width=400*dpr;canvas.height=400*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+const W=400,H=400,cx=W/2,cy=H/2,R=140;
+const labels=['US','Europe','UK','England','Africa','Earth','WW2','Germany'];
+const std=[0.031,0.014,0.013,0.012,0.009,0.008,0.008,0.006];
+const mx2=Math.max(...std);
+function drawRadar(){ctx.clearRect(0,0,W,H);const n=labels.length;
+// grid
+for(let ring=1;ring<=4;ring++){ctx.beginPath();for(let i=0;i<=n;i++){const a=((i%n)/n)*Math.PI*2-Math.PI/2;const r=R*(ring/4);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}ctx.closePath();ctx.strokeStyle='rgba(30,32,48,0.6)';ctx.lineWidth=0.8;ctx.stroke();}
+// axes
+for(let i=0;i<n;i++){const a=(i/n)*Math.PI*2-Math.PI/2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);ctx.strokeStyle='rgba(30,32,48,0.4)';ctx.lineWidth=0.5;ctx.stroke();
+ctx.font='500 11px Outfit';ctx.fillStyle='var(--dim)';ctx.textAlign='center';ctx.textBaseline='middle';const lx=cx+Math.cos(a)*(R+20),ly=cy+Math.sin(a)*(R+20);ctx.fillStyle='#8a8890';ctx.fillText(labels[i],lx,ly);}
+// data
+ctx.beginPath();for(let i=0;i<=n;i++){const a=((i%n)/n)*Math.PI*2-Math.PI/2;const v=std[i%n]/mx2;ctx.lineTo(cx+Math.cos(a)*R*v,cy+Math.sin(a)*R*v);}ctx.closePath();ctx.fillStyle='rgba(240,160,80,0.12)';ctx.fill();ctx.strokeStyle='rgba(240,160,80,0.7)';ctx.lineWidth=2;ctx.stroke();
+// dots
+for(let i=0;i<n;i++){const a=(i/n)*Math.PI*2-Math.PI/2;const v=std[i]/mx2;const px=cx+Math.cos(a)*R*v,py=cy+Math.sin(a)*R*v;ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fillStyle='#f0a050';ctx.fill();ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fillStyle='rgba(240,160,80,0.2)';ctx.fill();}
+ctx.font='600 12px "IBM Plex Mono"';ctx.fillStyle='#4e4d55';ctx.textAlign='center';ctx.fillText('Distribution PageRank — Top 8',cx,H-15);}
+const rObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){drawRadar();rObs.unobserve(e.target);}});},{threshold:0.3});
+rObs.observe(canvas.parentElement);})();
+
+// ═══════════════════════════════════════
+// 17. KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════
+const konamiSeq=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
+let konamiIdx=0;
+document.addEventListener('keydown',e=>{
+    if(e.key==='t'||e.key==='T')window.scrollTo({top:0,behavior:'smooth'});
+    if(e.key==='ArrowDown'){e.preventDefault();window.scrollBy({top:window.innerHeight*0.8,behavior:'smooth'});}
+    if(e.key==='ArrowUp'){e.preventDefault();window.scrollBy({top:-window.innerHeight*0.8,behavior:'smooth'});}
+    // konami
+    if(e.key===konamiSeq[konamiIdx]){konamiIdx++;if(konamiIdx===konamiSeq.length){document.getElementById('easterEgg').classList.add('show');konamiIdx=0;}}else konamiIdx=0;
+});
+
+// ═══════════════════════════════════════
+// 18. TABLE ROW STAGGER ANIMATION
+// ═══════════════════════════════════════
+const rowObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){const rows=e.target.querySelectorAll('tbody tr');rows.forEach((r,i)=>{r.style.opacity='0';r.style.transform='translateX(-10px)';setTimeout(()=>{r.style.transition='all 0.4s cubic-bezier(0.16,1,0.3,1)';r.style.opacity='1';r.style.transform='none';},i*50);});rowObs.unobserve(e.target);}});},{threshold:0.2});
+document.querySelectorAll('.r-panel').forEach(p=>rowObs.observe(p));
 </script>
-
 </body>
 </html>
